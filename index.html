@@ -1,0 +1,999 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1B2024">
+<meta name="description" content="Diario de estudio de piezas y control de cañas">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Atril y Cañas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+:root{
+  --bg:#F1F2EE; --surface:#FFFFFF; --surface-2:#E6E8E2; --ink:#1B2024; --muted:#5B6468; --line:#D5D9D0;
+  --brass:#8A5E0B; --brass-ink:#FFFFFF; --brass-soft:#F3E6C5;
+  --cane:#EBD8A0; --cane-edge:#B89A4C;
+  --good:#2A7246; --good-soft:#DBEEE1; --bad:#B0382A; --bad-soft:#F6DDD8; --warn:#9A5E08; --warn-soft:#F7E7C9;
+  --shadow:0 1px 2px rgba(27,32,36,.06),0 6px 18px rgba(27,32,36,.06);
+  --display:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  --body:'Atkinson Hyperlegible',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#111416; --surface:#1A1F22; --surface-2:#252B2F; --ink:#E7EAE5; --muted:#9BA4A7; --line:#2E3539;
+    --brass:#E0AA45; --brass-ink:#1A1405; --brass-soft:#3A2F16;
+    --cane:#8C7636; --cane-edge:#C8A95A;
+    --good:#6EC291; --good-soft:#16301F; --bad:#F08473; --bad-soft:#3A1C18; --warn:#E7B45C; --warn-soft:#382A12;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#111416; --surface:#1A1F22; --surface-2:#252B2F; --ink:#E7EAE5; --muted:#9BA4A7; --line:#2E3539;
+  --brass:#E0AA45; --brass-ink:#1A1405; --brass-soft:#3A2F16;
+  --cane:#8C7636; --cane-edge:#C8A95A;
+  --good:#6EC291; --good-soft:#16301F; --bad:#F08473; --bad-soft:#3A1C18; --warn:#E7B45C; --warn-soft:#382A12;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.app{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:0 calc(92px + env(safe-area-inset-bottom,0px))}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:14px 10px;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.top h1{font-family:var(--display);font-weight:700;font-size:32px;line-height:1;margin:0;letter-spacing:.005em}
+.top .sub{color:var(--muted);font-size:14px;text-align:right}
+h2{font-family:var(--display);font-weight:600;font-size:22px;margin:0;text-wrap:balance}
+.eyebrow{font-family:var(--body);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.stack{display:flex;flex-direction:column;gap:12px}
+section{margin-top:22px;display:flex;flex-direction:column;gap:10px}
+.num{font-family:var(--display);font-variant-numeric:tabular-nums}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:360px){.grid2{grid-template-columns:1fr}}
+
+/* botones */
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 14px;font-weight:700;min-height:44px}
+.btn.primary,.cta{background:var(--brass);color:var(--brass-ink);border-color:var(--brass)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn[data-armed]{background:var(--bad);color:#fff;border-color:var(--bad)}
+.cta{display:flex;width:100%;align-items:center;justify-content:center;gap:10px;border:none;border-radius:14px;padding:16px;font-family:var(--display);font-size:24px;font-weight:700;letter-spacing:.02em;box-shadow:var(--shadow)}
+.row-actions{display:flex;flex-wrap:wrap;gap:8px}
+
+/* chips */
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted);white-space:nowrap}
+.chip.good{background:var(--good-soft);color:var(--good)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.brass{background:var(--brass-soft);color:var(--brass)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.filter{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:14px;min-height:36px}
+.filter[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+/* tarjetas de hoy */
+.hero-ev .big{font-family:var(--display);font-size:52px;font-weight:700;line-height:.95;font-variant-numeric:tabular-nums}
+.hero-ev .lbl{font-size:14px;color:var(--muted)}
+.today-reed{display:flex;gap:12px;align-items:center;text-align:left;width:100%;cursor:pointer}
+.today-reed .reed{width:22px;height:56px;flex:none}
+.today-reed .big{font-family:var(--display);font-size:44px;font-weight:700;line-height:1}
+.rod-line{display:flex;align-items:center;gap:8px;font-size:14px;border-top:1px dashed var(--line);padding-top:8px;margin-top:8px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.kpi b{display:block;font-family:var(--display);font-size:30px;line-height:1;font-variant-numeric:tabular-nums}
+.kpi span{font-size:12px;color:var(--muted)}
+
+/* filas de piezas */
+.list{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.row{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid var(--line);padding:12px 14px}
+.row:last-child{border-bottom:0}
+.row-title{font-weight:700;line-height:1.25}
+.row-meta{grid-column:1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
+.row-side{grid-row:1 / span 2;grid-column:2;text-align:right;font-family:var(--display);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1}
+.row-side small{display:block;font-family:var(--body);font-size:11px;font-weight:400;color:var(--muted);margin-top:2px}
+.bar{grid-column:1 / -1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;margin-top:4px}
+.bar span{display:block;height:100%;background:var(--brass);border-radius:3px}
+.bar.good span{background:var(--good)} .bar.bad span{background:var(--bad)}
+.group-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+
+/* cañas */
+.reeds{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.reedcard{position:relative;display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px;min-width:0}
+.reedcard.is-sug{border:2px solid var(--brass);padding:9px}
+.reedcard.is-rod{background:linear-gradient(var(--brass-soft),var(--surface) 70%)}
+.rc-top{display:flex;align-items:flex-end;gap:8px}
+.rc-top .reed{width:16px;height:40px;flex:none}
+.rc-num{font-family:var(--display);font-size:38px;font-weight:700;line-height:.9}
+.rc-meta{display:flex;flex-direction:column;gap:2px;font-size:12px;line-height:1.3;min-width:0}
+.rc-meta .age{font-weight:700;font-size:13px}
+.rc-flag{position:absolute;top:8px;right:8px}
+.dots{display:flex;gap:3px;margin-top:2px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);flex:none}
+.dot.bien{background:var(--good);border-color:var(--good)}
+.dot.mal{background:var(--bad);border-color:var(--bad)}
+.reedcard.empty{align-items:center;justify-content:center;border-style:dashed;color:var(--muted);min-height:130px}
+details.retired summary{cursor:pointer;font-weight:700;padding:6px 0}
+.rt-row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);width:100%;background:none;border-left:0;border-right:0;border-top:0;text-align:left;font-size:14px}
+
+/* hoja */
+.sheet{position:fixed;inset:0;z-index:20;background:var(--bg);overflow-y:auto;overscroll-behavior:contain;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.sheet-inner{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:0 40px}
+.sheet-head{position:sticky;top:0;z-index:2;background:var(--bg);display:flex;align-items:center;gap:8px;padding-block:10px}
+.sheet-head h2{font-size:26px;flex:1;min-width:0;overflow-wrap:anywhere}
+.icon-btn{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;flex:none}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label,.lbl{font-size:13px;font-weight:700;color:var(--muted)}
+input[type=text],input[type=number],input[type=date],select,textarea{width:100%;min-height:44px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 10px}
+textarea{min-height:76px;resize:vertical}
+.seg{display:flex;background:var(--surface-2);border-radius:12px;padding:3px;gap:3px}
+.seg button{flex:1;border:0;background:transparent;border-radius:9px;padding:10px 6px;font-weight:700;min-height:44px}
+.seg button[aria-pressed="true"]{background:var(--surface);box-shadow:var(--shadow)}
+.seg button[data-v="bien"][aria-pressed="true"]{background:var(--good-soft);color:var(--good)}
+.seg button[data-v="mal"][aria-pressed="true"]{background:var(--bad-soft);color:var(--bad)}
+
+/* metrónomo */
+.met{background:var(--ink);color:var(--bg);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.met button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:inherit;border-radius:10px;min-height:44px;min-width:48px;font-weight:700}
+:root[data-theme="dark"] .met button{background:rgba(0,0,0,.06);border-color:rgba(0,0,0,.16)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .met button{background:rgba(0,0,0,.06);border-color:rgba(0,0,0,.16)}}
+.met-bpm{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto;align-items:center;gap:5px}
+.met-bpm button{min-width:0;width:44px;padding:0}
+.met-bpm output{text-align:center;font-family:var(--display);font-size:clamp(48px,15vw,72px);font-weight:700;line-height:.9;font-variant-numeric:tabular-nums}
+.met-bpm output small{display:block;font-family:var(--body);font-size:12px;font-weight:400;opacity:.7}
+.met input[type=range]{width:100%;accent-color:var(--brass)}
+.met-beats{display:flex;justify-content:center;gap:10px;min-height:16px}
+.met-beats i{width:14px;height:14px;border-radius:50%;border:2px solid currentColor;opacity:.45;transition:transform .06s}
+.met-beats i.on{background:var(--brass);border-color:var(--brass);opacity:1;transform:scale(1.25)}
+.met-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.met-row .play{flex:1;background:var(--brass);border-color:var(--brass);color:var(--brass-ink);font-size:18px}
+.met select{background:transparent;color:inherit;border-color:rgba(127,127,127,.4);min-height:40px;flex:1;min-width:0}
+.met select option{color:#1B2024;background:#fff}
+.met label{display:flex;align-items:center;gap:6px;font-size:14px}
+.clock{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.clock b{font-family:var(--display);font-size:34px;font-variant-numeric:tabular-nums}
+.reed-pick{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.reed-pick label{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:6px 2px;font-size:11px;color:var(--muted);cursor:pointer;text-align:center}
+.reed-pick label b{font-family:var(--display);font-size:24px;line-height:1;color:var(--ink)}
+.reed-pick input{position:absolute;opacity:0;pointer-events:none}
+.reed-pick label:has(input:checked){border:2px solid var(--brass);background:var(--brass-soft);padding:5px 1px}
+.reed-pick label:has(input:focus-visible){outline:2px solid var(--brass)}
+
+/* detalle */
+.kv{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kv div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px}
+.kv dt{font-size:12px;color:var(--muted)}
+.kv dd{margin:0;font-family:var(--display);font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-size:10px;font-family:var(--body)}
+.hist{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.hist li{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line);font-size:14px}
+.hist li:last-child{border-bottom:0}
+.hist .h-main{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font-variant-numeric:tabular-nums}
+.hist .x{border:0;background:transparent;color:var(--muted);width:36px;height:36px;border-radius:8px}
+.hist .x[data-armed]{background:var(--bad);color:#fff}
+.rodaje-steps{display:flex;gap:4px;flex-wrap:wrap}
+.rodaje-steps span{min-width:34px;text-align:center;padding:4px 0;border-radius:8px;font-size:13px;font-weight:700;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums}
+.rodaje-steps span.done{background:var(--brass);color:var(--brass-ink)}
+.rodaje-steps span.next{outline:2px solid var(--brass);color:var(--brass);background:var(--brass-soft)}
+.banner{background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:10px 12px;font-size:14px}
+.empty-state{padding:24px;text-align:center;color:var(--muted)}
+
+/* navegación */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+nav.tabs button{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 10px;font-size:12px;font-weight:700;color:var(--muted);min-height:56px}
+nav.tabs button svg{width:24px;height:24px}
+nav.tabs button[aria-current="page"]{color:var(--brass)}
+#toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:40;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;max-width:calc(100% - 32px);box-shadow:var(--shadow)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+<style>html{padding-top:env(safe-area-inset-top,0px)}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+</head>
+<body>
+<div class="app">
+  <header class="top"><h1 id="title">Hoy</h1><div class="sub" id="subtitle"></div></header>
+  <main id="main"><p class="muted">Cargando tus datos…</p></main>
+</div>
+<nav class="tabs" aria-label="Secciones"><div class="in">
+  <button data-action="tab" data-tab="hoy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Hoy</button>
+  <button data-action="tab" data-tab="piezas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>Piezas</button>
+  <button data-action="tab" data-tab="canas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 22V8c0-4 2-6 4-6s4 2 4 6v14z"/><path d="M8.5 12q3.5 2.5 7 0"/></svg>Cañas</button>
+  <button data-action="tab" data-tab="mas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Ajustes</button>
+</div></nav>
+<div id="sheet-root"></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+/* ============ utilidades ============ */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = (n) => String(n).padStart(2, '0');
+const iso = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const todayISO = () => iso(new Date());
+const parseISO = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const daysBetween = (a, b) => Math.round((parseISO(b) - parseISO(a)) / 864e5);
+const addDays = (s, n) => { const d = parseISO(s); d.setDate(d.getDate() + n); return iso(d); };
+const MES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const MES_L = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const DOW = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const fmtDate = (s) => { if (!s) return '—'; const d = parseISO(s); const y = d.getFullYear() !== new Date().getFullYear() ? ' ' + String(d.getFullYear()).slice(2) : ''; return d.getDate() + ' ' + MES[d.getMonth()] + y; };
+const fmtLong = (s) => { const d = parseISO(s); return DOW[d.getDay()] + ', ' + d.getDate() + ' de ' + MES_L[d.getMonth()]; };
+const fmtNum = (n, dec = 1) => Number(n).toLocaleString('es-ES', {maximumFractionDigits: dec});
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const intOrNull = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null; };
+function fmtEdad(days) {
+  if (days == null) return '—';
+  if (days < 45) return days + (days === 1 ? ' día' : ' días');
+  const m = Math.round(days / 30.44);
+  if (m < 12) return m + ' meses';
+  const y = Math.floor(m / 12), r = m % 12;
+  return y + (y === 1 ? ' año' : ' años') + (r ? ' y ' + r + (r === 1 ? ' mes' : ' meses') : '');
+}
+const fmtHace = (d) => d == null ? 'sin usar' : d === 0 ? 'hoy' : d === 1 ? 'ayer' : 'hace ' + d + ' días';
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, 2600);
+}
+const reedSVG = (cls = '') => `<svg class="reed ${cls}" viewBox="0 0 24 60" aria-hidden="true"><path d="M4 59V16C4 6.5 7.5 1.5 12 1.5S20 6.5 20 16v43z" fill="var(--cane)" stroke="var(--cane-edge)" stroke-width="1.2"/><path d="M4.6 30Q12 37 19.4 30" fill="none" stroke="var(--cane-edge)" stroke-width="1.2"/></svg>`;
+
+/* ============ almacenamiento ============ */
+const TARGET = 'pwa';
+const SEED = /*@@SEED@@*/null;
+const DEFAULT_CONFIG = {instrumento: '', marca: '', modelo: '', dureza: '',
+  agrupaciones: ['Big band', 'Orquesta', 'Clases', 'Combo'], eventos: [], rodaje: [3, 3, 5, 5, 7, 7, 10, 10, 20]};
+const COLLS = ['piezas', 'sesiones', 'canas'];
+const S = {piezas: {}, sesiones: {}, canas: {}, config: {...DEFAULT_CONFIG}, mode: 'loading', loaded: {}};
+let DB = null;
+const LS_KEY = 'atril-y-canas-v1';
+
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) { const o = JSON.parse(raw); COLLS.forEach((c) => { S[c] = o[c] || {}; }); S.config = {...DEFAULT_CONFIG, ...(o.config || {})}; }
+  } catch (e) { /* sin almacenamiento local */ }
+}
+function saveLocal() {
+  localStorage.setItem(LS_KEY, JSON.stringify({piezas: S.piezas, sesiones: S.sesiones, canas: S.canas, config: S.config}));
+}
+const localVacio = () => COLLS.every((c) => !Object.keys(S[c]).length);
+function cargarSeed() {
+  COLLS.forEach((c) => { S[c] = {}; (SEED[c] || []).forEach((x) => { S[c][x.id] = {...x}; }); });
+  S.config = {...DEFAULT_CONFIG, ...(SEED.config || {})};
+  try { saveLocal(); } catch (e) { /* ignorar */ }
+}
+const nowISO = () => new Date().toISOString();
+const body = (o) => { const {id, ...rest} = o; return JSON.parse(JSON.stringify(rest)); };
+
+async function put(coll, id, data) {
+  const clean = body({...data, mod: nowISO()});
+  S[coll][id] = {id, ...clean};
+  scheduleRender();
+  if (S.mode === 'db') await DB.collection(coll).doc(id).set(clean); else saveLocal();
+}
+async function putRaw(coll, id, data) {
+  const clean = body(data);
+  S[coll][id] = {id, ...clean};
+  scheduleRender();
+  if (S.mode === 'db') await DB.collection(coll).doc(id).set(clean); else saveLocal();
+}
+async function putConfigRaw(cfg) {
+  S.config = {...DEFAULT_CONFIG, ...cfg};
+  scheduleRender();
+  if (S.mode === 'db') await DB.doc('config/general').set(JSON.parse(JSON.stringify(S.config))); else saveLocal();
+}
+function combinarDoc(coll, cur, inc) {
+  if (!cur) return inc;
+  const incNuevo = String(inc.mod || '') > String(cur.mod || '');
+  const nuevo = incNuevo ? inc : cur, viejo = incNuevo ? cur : inc;
+  if (coll !== 'canas') return nuevo;
+  const porDia = {};
+  (viejo.usos || []).forEach((u) => { porDia[u.f] = u; });
+  (nuevo.usos || []).forEach((u) => { porDia[u.f] = u; });
+  return {...nuevo, usos: Object.values(porDia).sort((a, b) => a.f.localeCompare(b.f))};
+}
+async function del(coll, id) {
+  delete S[coll][id];
+  scheduleRender();
+  if (S.mode === 'db') await DB.collection(coll).doc(id).delete(); else saveLocal();
+}
+async function putConfig(cfg) {
+  S.config = {...DEFAULT_CONFIG, ...cfg, mod: nowISO()};
+  scheduleRender();
+  if (S.mode === 'db') await DB.doc('config/general').set(JSON.parse(JSON.stringify(S.config))); else saveLocal();
+}
+async function safe(fn, okMsg) {
+  try { await fn(); if (okMsg) toast(okMsg); return true; }
+  catch (e) {
+    const code = e && e.code;
+    toast(code === 'quota_exceeded' ? 'Almacenamiento lleno: exporta y borra datos antiguos.' : 'No se ha podido guardar. Revisa la conexión e inténtalo de nuevo.');
+    return false;
+  }
+}
+function subscribe() {
+  COLLS.forEach((c) => {
+    DB.collection(c).onSnapshot((snap) => {
+      const o = {}; snap.docs.forEach((d) => { o[d.id] = {id: d.id, ...d.data()}; });
+      S[c] = o; S.loaded[c] = true; scheduleRender();
+    }, onDbError);
+  });
+  DB.doc('config/general').onSnapshot((snap) => {
+    S.config = {...DEFAULT_CONFIG, ...(snap.exists ? snap.data() : {})}; S.loaded.config = true; scheduleRender();
+  }, onDbError);
+}
+function onDbError(e) { if (e && e.code !== 'revoked') toast('Se ha perdido la conexión con tus datos. Recarga la página.'); }
+async function initStore() {
+  let db = null;
+  if (TARGET === 'artifact') {
+    try { if (window.claude && window.claude.use) db = await window.claude.use('db'); } catch (e) { db = null; }
+  }
+  if (db) { DB = db; S.mode = 'db'; subscribe(); return; }
+  S.mode = 'local'; loadLocal();
+  if (localVacio() && SEED) cargarSeed();
+  if (TARGET === 'pwa' && navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  render();
+}
+const ready = () => S.mode === 'local' || (S.mode === 'db' && ['piezas', 'sesiones', 'canas', 'config'].every((k) => S.loaded[k]));
+
+/* ============ cálculos ============ */
+const eventoDe = (p) => (S.config.eventos || []).find((e) => e.id === p.evento) || null;
+const limiteDe = (p) => p.fechaLimite || eventoDe(p)?.fecha || null;
+const sesionesDe = (pid) => Object.values(S.sesiones).filter((s) => s.piezaId === pid)
+  .sort((a, b) => a.fecha.localeCompare(b.fecha) || String(a.creada || '').localeCompare(String(b.creada || '')));
+
+function statsPieza(p) {
+  const todas = sesionesDe(p.id);
+  const ses = todas.filter((s) => Number.isFinite(s.tempoLimpio));
+  const actual = ses.length ? ses[ses.length - 1].tempoLimpio : null;
+  const ini = p.tempoInicial ?? (ses[0]?.tempoLimpio ?? null);
+  const obj = p.tempoObjetivo ?? null;
+  let pct = null;
+  if (actual != null && obj != null && ini != null) pct = obj === ini ? (actual >= obj ? 1 : 0) : Math.max(0, Math.min(1, (actual - ini) / (obj - ini)));
+  let reg = null, eta = null;
+  if (ses.length >= 3 && new Set(ses.map((s) => s.fecha)).size >= 2) {
+    const x0 = ses[0].fecha, xs = ses.map((s) => daysBetween(x0, s.fecha)), ys = ses.map((s) => s.tempoLimpio);
+    const n = xs.length, mx = xs.reduce((a, b) => a + b) / n, my = ys.reduce((a, b) => a + b) / n;
+    let sxy = 0, sxx = 0; xs.forEach((x, i) => { sxy += (x - mx) * (ys[i] - my); sxx += (x - mx) ** 2; });
+    const b = sxx ? sxy / sxx : 0; reg = {x0, b, a: my - b * mx};
+    if (obj != null && actual < obj && b > 0) eta = addDays(x0, Math.ceil((obj - reg.a) / b));
+  }
+  const lim = limiteDe(p);
+  let estado = 'ok';
+  if (obj == null) estado = 'sinTempo';
+  else if (actual != null && actual >= obj) estado = 'listo';
+  else if (lim && ((eta && eta > lim) || (reg && reg.b <= 0))) estado = 'riesgo';
+  const minutos = todas.reduce((s, x) => s + (x.minutos || 0), 0);
+  return {todas, ses, actual, ini, obj, pct, reg, eta, lim, estado, minutos, semana: reg ? reg.b * 7 : null};
+}
+
+function canasActuales() {
+  const by = {};
+  Object.values(S.canas).filter((c) => c.estado !== 'retirada').forEach((c) => {
+    if (!by[c.slot] || String(c.estreno || '') > String(by[c.slot].estreno || '')) by[c.slot] = c;
+  });
+  return by;
+}
+function statsCana(c) {
+  const usos = [...(c.usos || [])].map((u, i) => ({...u, _i: i})).sort((a, b) => a.f.localeCompare(b.f));
+  const ultimo = usos.length ? usos[usos.length - 1].f : null;
+  const prot = S.config.rodaje || [];
+  const rodHechos = usos.filter((u) => u.rod).length;
+  return {
+    usos, ultimo, hace: ultimo ? daysBetween(ultimo, todayISO()) : null,
+    bien: usos.filter((u) => u.val === 'bien').length, mal: usos.filter((u) => u.val === 'mal').length,
+    min: usos.reduce((s, u) => s + (u.min || 0), 0), rodHechos,
+    rodSig: c.estado === 'rodaje' ? (prot[rodHechos] ?? null) : null,
+    rodHoy: c.estado === 'rodaje' && ultimo === todayISO(),
+    edad: c.estreno ? daysBetween(c.estreno, c.retirada || todayISO()) : null,
+  };
+}
+function sugerida() {
+  const act = Object.values(canasActuales()).filter((c) => c.estado === 'activa');
+  act.sort((a, b) => String(statsCana(a).ultimo || '').localeCompare(String(statsCana(b).ultimo || '')) || a.slot - b.slot);
+  return act[0] || null;
+}
+const enRodaje = () => Object.values(canasActuales()).filter((c) => c.estado === 'rodaje').sort((a, b) => a.slot - b.slot);
+function proximoEvento() {
+  const hoy = todayISO(), evs = S.config.eventos || [];
+  const fut = evs.filter((e) => e.fecha && e.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  return fut[0] || evs.find((e) => !e.fecha) || null;
+}
+const ORDEN_ESTADO = {riesgo: 0, ok: 1, sinTempo: 2, listo: 3};
+function ultimaCopia() { try { return localStorage.getItem('atril-ultima-copia'); } catch (e) { return null; } }
+function bannerHoy() {
+  if (S.mode === 'db') return '';
+  if (TARGET !== 'pwa') return '<p class="banner">Modo local: los datos se guardan solo en este navegador.</p>';
+  const u = ultimaCopia(), d = u ? daysBetween(u, todayISO()) : null;
+  if (d != null && d < 7) return '';
+  return `<div class="banner" style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px"><span>${d == null ? 'Aún no has hecho copia de tus datos.' : 'Última copia hace ' + d + ' días.'}</span><button class="btn" data-action="exportar">Exportar</button></div>`;
+}
+
+/* ============ vistas ============ */
+let TAB = 'hoy';
+try { TAB = localStorage.getItem('atril-tab') || 'hoy'; } catch (e) { /* ignorar */ }
+const FILTRO = {agr: 'Todas', estado: 'estudio'};
+
+function estadoChip(st) {
+  if (st.estado === 'sinTempo') return '<span class="chip warn">Falta tempo objetivo</span>';
+  if (st.estado === 'riesgo') return '<span class="chip bad">No llega a tiempo</span>';
+  if (st.estado === 'listo') return '<span class="chip good">A tempo</span>';
+  if (st.eta) return `<span class="chip">Llega ~${fmtDate(st.eta)}</span>`;
+  return '';
+}
+function piezaRow(p) {
+  const st = statsPieza(p), ev = eventoDe(p);
+  const cls = st.estado === 'listo' ? 'good' : st.estado === 'riesgo' ? 'bad' : '';
+  const side = st.obj != null
+    ? `${st.actual ?? '—'}<small>de ${st.obj} BPM</small>`
+    : `${st.actual ?? '—'}<small>BPM</small>`;
+  return `<button class="row" data-action="pieza" data-id="${esc(p.id)}">
+    <div class="row-title">${esc(p.titulo)}</div>
+    <div class="row-side">${side}</div>
+    <div class="row-meta"><span>${esc(p.agrupacion)}${ev ? ' · ' + esc(ev.nombre) : ''}</span>${estadoChip(st)}</div>
+    <div class="bar ${cls}"><span style="width:${Math.round((st.pct ?? 0) * 100)}%"></span></div>
+  </button>`;
+}
+
+const VIEWS = {
+  hoy() {
+    const hoy = todayISO(), ev = proximoEvento(), sug = sugerida(), rod = enRodaje();
+    const lunes = addDays(hoy, -((parseISO(hoy).getDay() + 6) % 7));
+    const semana = Object.values(S.sesiones).filter((s) => s.fecha >= lunes);
+    const minSem = semana.reduce((a, s) => a + (s.minutos || 0), 0);
+    const piezas = Object.values(S.piezas).filter((p) => p.estado === 'estudio').map((p) => ({p, st: statsPieza(p)}))
+      .sort((a, b) => (ORDEN_ESTADO[a.st.estado] - ORDEN_ESTADO[b.st.estado]) || ((a.st.pct ?? 2) - (b.st.pct ?? 2)) || ((a.p.orden ?? 99) - (b.p.orden ?? 99)));
+    let evHTML = '<div class="card hero-ev"><p class="eyebrow">Próxima cita</p><p class="muted small">Añade conciertos o ensayos en Ajustes.</p></div>';
+    if (ev) {
+      const faltan = ev.fecha ? daysBetween(hoy, ev.fecha) : null;
+      evHTML = `<div class="card hero-ev stack" style="gap:4px"><p class="eyebrow">${esc(ev.nombre)}</p>
+        ${faltan != null ? `<div class="big">${faltan}</div><div class="lbl">${faltan === 1 ? 'día' : 'días'} · ${fmtDate(ev.fecha)}</div>`
+        : `<div class="lbl">Sin fecha todavía</div><button class="btn" data-action="tab" data-tab="mas" style="margin-top:6px">Añadir fecha</button>`}</div>`;
+    }
+    const s = sug ? statsCana(sug) : null;
+    const reedHTML = `<div class="card">
+      <p class="eyebrow">Caña de hoy</p>
+      ${sug ? `<button class="today-reed" data-action="cana" data-id="${esc(sug.id)}" style="background:none;border:0;padding:6px 0 0">${reedSVG()}<div><div class="big">${sug.slot}</div><div class="small muted">${fmtHace(s.hace)}</div></div></button>` : '<p class="muted small">Sin cañas activas.</p>'}
+      ${rod.map((c) => { const r = statsCana(c); return `<button class="rod-line" data-action="cana" data-id="${esc(c.id)}" style="background:none;border-left:0;border-right:0;border-bottom:0;width:100%;text-align:left"><span class="chip brass">Rodaje</span><span>Caña ${c.slot}: ${r.rodHoy ? 'hecho hoy' : r.rodSig != null ? r.rodSig + ' min hoy' : 'lista para rodar'}</span></button>`; }).join('')}
+    </div>`;
+    return `${bannerHoy()}
+      <button class="cta" data-action="sesion">Empezar sesión</button>
+      <div class="grid2" style="margin-top:12px">${evHTML}${reedHTML}</div>
+      <section><p class="eyebrow">Esta semana</p>
+        <div class="kpis"><div class="kpi"><b>${minSem}</b><span>minutos</span></div><div class="kpi"><b>${semana.length}</b><span>sesiones</span></div><div class="kpi"><b>${new Set(semana.map((x) => x.piezaId)).size}</b><span>piezas</span></div></div>
+      </section>
+      <section><div class="group-h"><h2>En estudio</h2><span class="muted small">${piezas.length} piezas</span></div>
+        ${piezas.length ? `<div class="list">${piezas.map((x) => piezaRow(x.p)).join('')}</div>` : '<div class="card empty-state">No hay piezas en estudio. Añádelas en Piezas.</div>'}
+      </section>`;
+  },
+
+  piezas() {
+    const agrs = ['Todas', ...(S.config.agrupaciones || [])];
+    const estados = [['estudio', 'En estudio'], ['lista', 'Listas'], ['archivada', 'Archivadas']];
+    let ps = Object.values(S.piezas).filter((p) => p.estado === FILTRO.estado && (FILTRO.agr === 'Todas' || p.agrupacion === FILTRO.agr));
+    const grupos = {};
+    ps.forEach((p) => { const k = eventoDe(p)?.nombre || 'Sin concierto asignado'; (grupos[k] = grupos[k] || []).push(p); });
+    const keys = Object.keys(grupos).sort((a, b) => (a === 'Sin concierto asignado') - (b === 'Sin concierto asignado') || a.localeCompare(b));
+    return `<div class="chips" role="group" aria-label="Agrupación">${agrs.map((a) => `<button class="filter" data-action="fagr" data-v="${esc(a)}" aria-pressed="${FILTRO.agr === a}">${esc(a)}</button>`).join('')}</div>
+      <div class="seg" role="group" aria-label="Estado" style="margin-top:10px">${estados.map(([v, l]) => `<button data-action="festado" data-v="${v}" aria-pressed="${FILTRO.estado === v}">${l}</button>`).join('')}</div>
+      <button class="btn" data-action="piezaForm" style="margin-top:12px;width:100%">+ Nueva pieza</button>
+      ${keys.length ? keys.map((k) => `<section><div class="group-h"><h2>${esc(k)}</h2><span class="muted small">${grupos[k].length}</span></div>
+        <div class="list">${grupos[k].sort((a, b) => (a.orden ?? 99) - (b.orden ?? 99) || a.titulo.localeCompare(b.titulo)).map(piezaRow).join('')}</div></section>`).join('')
+      : '<section><div class="card empty-state">No hay piezas con este filtro.</div></section>'}`;
+  },
+
+  canas() {
+    const act = canasActuales(), sug = sugerida();
+    const retiradas = Object.values(S.canas).filter((c) => c.estado === 'retirada').sort((a, b) => String(b.retirada || '').localeCompare(String(a.retirada || '')));
+    const cards = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((slot) => {
+      const c = act[slot];
+      if (!c) return `<button class="reedcard empty" data-action="estrenar" data-slot="${slot}"><span class="rc-num">${slot}</span><span class="small">Vacía · estrenar</span></button>`;
+      const s = statsCana(c), isSug = sug && sug.id === c.id, rod = c.estado === 'rodaje';
+      const dots = s.usos.slice(-6).map((u) => `<i class="dot ${u.val || ''}"></i>`).join('');
+      return `<button class="reedcard ${isSug ? 'is-sug' : ''} ${rod ? 'is-rod' : ''}" data-action="cana" data-id="${esc(c.id)}" aria-label="Caña ${slot}">
+        ${isSug ? '<span class="chip brass rc-flag">Hoy</span>' : rod ? `<span class="chip brass rc-flag">${s.rodHechos}/${(S.config.rodaje || []).length}</span>` : ''}
+        <div class="rc-top">${reedSVG()}<span class="rc-num">${slot}</span></div>
+        <div class="rc-meta"><span class="age">${c.estrenoAprox ? '~' : ''}${fmtEdad(s.edad)}</span><span class="muted">${fmtHace(s.hace)}</span><span class="muted">${s.usos.length} usos</span><span class="dots">${dots}</span></div>
+      </button>`;
+    }).join('');
+    const cfg = S.config, desc = [cfg.marca, cfg.modelo, cfg.dureza && 'dureza ' + cfg.dureza].filter(Boolean).join(' · ');
+    return `<p class="muted small" style="margin:0 0 10px">${desc ? esc(desc) + '. ' : ''}Rotación: la sugerida es la activa que lleva más tiempo sin tocarse.</p>
+      <div class="reeds">${cards}</div>
+      <section><details class="retired"><summary>Cañas retiradas (${retiradas.length})</summary>
+        ${retiradas.map((c) => { const s = statsCana(c); return `<button class="rt-row" data-action="cana" data-id="${esc(c.id)}"><span><b>Caña ${c.slot}</b> · ${s.usos.length} usos</span><span class="muted">${c.estreno ? fmtDate(c.estreno) + ' → ' : 'hasta '}${fmtDate(c.retirada)}</span></button>`; }).join('') || '<p class="muted small">Ninguna todavía.</p>'}
+      </details></section>`;
+  },
+
+  mas() {
+    const c = S.config;
+    const evs = (c.eventos || []).map((e, i) => `<div class="card stack" style="gap:8px">
+        <div class="field"><label for="ev-n-${i}">Nombre</label><input type="text" id="ev-n-${i}" value="${esc(e.nombre)}"></div>
+        <div class="grid2"><div class="field"><label for="ev-a-${i}">Agrupación</label><select id="ev-a-${i}">${(c.agrupaciones || []).map((a) => `<option ${a === e.agrupacion ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select></div>
+        <div class="field"><label for="ev-f-${i}">Fecha</label><input type="date" id="ev-f-${i}" value="${esc(e.fecha || '')}"></div></div>
+        <button class="btn danger" data-action="borrarEvento" data-i="${i}" data-confirm="1">Quitar</button></div>`).join('');
+    return `<section style="margin-top:0"><h2>Conciertos y citas</h2>${evs || '<p class="muted small">Sin citas.</p>'}<button class="btn" data-action="addEvento">+ Añadir cita</button></section>
+      <section><h2>Cañas</h2>
+        <div class="grid2"><div class="field"><label for="cf-inst">Instrumento</label><input type="text" id="cf-inst" value="${esc(c.instrumento)}" placeholder="p. ej. saxo alto"></div>
+        <div class="field"><label for="cf-marca">Marca</label><input type="text" id="cf-marca" value="${esc(c.marca)}"></div>
+        <div class="field"><label for="cf-modelo">Modelo</label><input type="text" id="cf-modelo" value="${esc(c.modelo)}"></div>
+        <div class="field"><label for="cf-dur">Dureza</label><input type="text" id="cf-dur" value="${esc(c.dureza)}"></div></div>
+        <div class="field"><label for="cf-rod">Rodaje (minutos por día, separados por comas)</label><input type="text" id="cf-rod" value="${esc((c.rodaje || []).join(', '))}"></div>
+        <div class="field"><label for="cf-agr">Agrupaciones (separadas por comas)</label><input type="text" id="cf-agr" value="${esc((c.agrupaciones || []).join(', '))}"></div>
+      </section>
+      <button class="cta" data-action="guardarAjustes" style="margin-top:16px;font-size:20px">Guardar ajustes</button>
+      <section><h2>${TARGET === 'pwa' ? 'Copia y paso al ordenador' : 'Copia e importación'}</h2>
+        <p class="muted small" style="margin:0">${TARGET === 'pwa'
+          ? 'Los datos se guardan en este móvil y funcionan sin conexión. Exporta el JSON (a Drive, correo o WhatsApp) y súbelo en la versión de Claude con «Combinar» para verlos en el ordenador.'
+          : S.mode === 'db' ? 'Tus datos se guardan en tu cuenta de Claude. Para traer lo anotado en la app del móvil, carga su JSON exportado y pulsa «Combinar».' : 'Modo local: los datos solo existen en este navegador. Exporta a menudo.'}</p>
+        <div class="row-actions"><button class="btn primary" data-action="exportar">Exportar JSON</button></div>
+        <p class="muted small" style="margin:0">Última copia desde este dispositivo: ${ultimaCopia() ? fmtDate(ultimaCopia()) : 'nunca'}</p>
+        <div id="export-box"></div>
+        <div class="field"><label for="imp-file">Importar un JSON exportado</label><input type="file" id="imp-file" accept=".json,application/json,text/plain"></div>
+        <div class="field"><label for="imp">o pega aquí su contenido</label><textarea id="imp" placeholder='{"config":…,"piezas":[…],"canas":[…],"sesiones":[…]}'></textarea></div>
+        <div class="row-actions"><button class="btn primary" data-action="importar" data-modo="combinar">Combinar con mis datos</button><button class="btn danger" data-action="importar" data-modo="reemplazar" data-confirm="1">Reemplazar todo</button></div>
+        <p class="muted small" style="margin:0">Combinar añade lo nuevo y, si una pieza o caña cambió en los dos sitios, se queda la versión más reciente; los usos de caña de ambos lados se juntan. Lo borrado en un lado no se borra en el otro.</p>
+      </section>`;
+  },
+};
+
+let rafPending = false;
+function scheduleRender() { if (!rafPending) { rafPending = true; requestAnimationFrame(() => { rafPending = false; render(); }); } }
+function render() {
+  const titles = {hoy: 'Hoy', piezas: 'Piezas', canas: 'Cañas', mas: 'Ajustes'};
+  $('#title').textContent = titles[TAB];
+  $('#subtitle').textContent = TAB === 'hoy' ? fmtLong(todayISO()) : TAB === 'canas' ? S.config.instrumento || '' : '';
+  document.querySelectorAll('nav.tabs button').forEach((b) => b.setAttribute('aria-current', b.dataset.tab === TAB ? 'page' : 'false'));
+  if (!ready()) { $('#main').innerHTML = '<p class="muted">Cargando tus datos…</p>'; return; }
+  const a = document.activeElement;
+  const editingMain = TAB === 'mas' && a && $('#main').contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName);
+  if (!editingMain) $('#main').innerHTML = VIEWS[TAB]();
+  refreshSheet();
+}
+
+/* ============ hojas ============ */
+let SHEET = null;
+function openSheet(title, kind, renderFn, onClose) {
+  SHEET = {kind, renderFn, onClose, title};
+  $('#sheet-root').innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet-inner">
+    <div class="sheet-head"><button class="icon-btn" data-action="close" aria-label="Cerrar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2 id="sheet-title">${esc(title)}</h2></div>
+    <div id="sheet-body">${renderFn()}</div></div></div>`;
+  document.body.style.overflow = 'hidden';
+}
+function refreshSheet() {
+  if (!SHEET || SHEET.kind !== 'detail') return;
+  const b = $('#sheet-body'), a = document.activeElement;
+  if (!b || (a && b.contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName))) return;
+  const html = SHEET.renderFn();
+  if (html == null) { closeSheet(); return; }
+  b.innerHTML = html;
+}
+function closeSheet() {
+  if (SHEET && SHEET.onClose) SHEET.onClose();
+  SHEET = null; $('#sheet-root').innerHTML = ''; document.body.style.overflow = '';
+}
+
+/* ---------- detalle de pieza ---------- */
+function chartPieza(st) {
+  const pts = st.ses.map((s) => ({x: parseISO(s.fecha).getTime(), y: s.tempoLimpio}));
+  if (pts.length < 2) return '<p class="muted small">La gráfica aparece a partir de dos sesiones con tempo limpio.</p>';
+  const W = 340, H = 190, pl = 34, pr = 12, pt = 12, pb = 26;
+  const x0 = pts[0].x;
+  let x1 = Math.max(pts[pts.length - 1].x, st.lim ? parseISO(st.lim).getTime() : 0);
+  if (x1 === x0) x1 = x0 + 864e5;
+  const vals = pts.map((p) => p.y).concat(st.obj != null ? [st.obj] : []);
+  const step = 10;
+  const y0 = Math.floor((Math.min(...vals) - 4) / step) * step, y1 = Math.ceil((Math.max(...vals) + 4) / step) * step;
+  const X = (x) => pl + (x - x0) / (x1 - x0) * (W - pl - pr), Y = (y) => pt + (1 - (y - y0) / (y1 - y0)) * (H - pt - pb);
+  const nT = Math.max(2, Math.min(5, Math.round((y1 - y0) / step)));
+  const tStep = Math.ceil((y1 - y0) / nT / 5) * 5;
+  let g = '';
+  for (let v = y0; v <= y1; v += tStep) g += `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${pl - 6}" y="${Y(v) + 3}" text-anchor="end">${v}</text>`;
+  const xl = (t, anchor) => { const d = new Date(t); return `<text x="${X(t)}" y="${H - 8}" text-anchor="${anchor}">${d.getDate()} ${MES[d.getMonth()]}</text>`; };
+  g += xl(x0, 'start') + xl(x1, 'end');
+  if (st.obj != null) g += `<line x1="${pl}" x2="${W - pr}" y1="${Y(st.obj)}" y2="${Y(st.obj)}" stroke="var(--good)" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${W - pr}" y="${Y(st.obj) - 5}" text-anchor="end" style="fill:var(--good)">objetivo ${st.obj}</text>`;
+  if (st.lim) { const lx = X(parseISO(st.lim).getTime()); g += `<line x1="${lx}" x2="${lx}" y1="${pt}" y2="${H - pb}" stroke="var(--bad)" stroke-width="1.2" stroke-dasharray="3 3"/>`; }
+  if (st.reg) {
+    const f = (t) => st.reg.a + st.reg.b * ((t - parseISO(st.reg.x0).getTime()) / 864e5);
+    const cy = (v) => Math.max(y0, Math.min(y1, v));
+    g += `<line x1="${X(x0)}" y1="${Y(cy(f(x0)))}" x2="${X(x1)}" y2="${Y(cy(f(x1)))}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2 4"/>`;
+  }
+  const line = pts.map((p) => X(p.x).toFixed(1) + ',' + Y(p.y).toFixed(1)).join(' ');
+  g += `<polyline points="${line}" fill="none" stroke="var(--brass)" stroke-width="2.2" stroke-linejoin="round"/>`;
+  g += pts.map((p, i) => `<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="${i === pts.length - 1 ? 4.5 : 2.5}" fill="${i === pts.length - 1 ? 'var(--brass)' : 'var(--surface)'}" stroke="var(--brass)" stroke-width="1.5"/>`).join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolución del tempo limpio">${g}</svg>`;
+}
+function openPieza(id) {
+  const render = () => {
+    const p = S.piezas[id]; if (!p) return null;
+    const st = statsPieza(p), ev = eventoDe(p);
+    $('#sheet-title') && ($('#sheet-title').textContent = p.titulo);
+    return `<div class="chips" style="margin-bottom:12px"><span class="chip">${esc(p.agrupacion)}</span>${ev ? `<span class="chip">${esc(ev.nombre)}</span>` : ''}${estadoChip(st)}</div>
+      ${st.obj == null ? `<div class="banner" style="margin-bottom:12px">Define el tempo de partida y el objetivo para ver el progreso.</div>` : ''}
+      <dl class="kv"><div><dt>Actual</dt><dd>${st.actual ?? '—'}</dd></div><div><dt>Objetivo</dt><dd>${st.obj ?? '—'}</dd></div><div><dt>Progreso</dt><dd>${st.pct != null ? Math.round(st.pct * 100) + '%' : '—'}</dd></div></dl>
+      <p class="small muted" style="margin:10px 0">${[
+        st.semana != null ? `Ritmo ${st.semana >= 0 ? '+' : ''}${fmtNum(st.semana)} BPM/semana` : null,
+        st.eta ? `llegada estimada ${fmtDate(st.eta)}` : null,
+        st.lim ? `límite ${fmtDate(st.lim)}` : null,
+        st.minutos ? `${st.minutos} min estudiados` : null].filter(Boolean).join(' · ') || 'Sin sesiones todavía.'}</p>
+      <div class="card">${chartPieza(st)}</div>
+      <div class="row-actions" style="margin-top:12px"><button class="btn primary" data-action="sesion" data-id="${esc(id)}">Estudiar ahora</button><button class="btn" data-action="piezaForm" data-id="${esc(id)}">Editar pieza</button></div>
+      ${p.notas ? `<section><p class="eyebrow">Notas</p><p style="margin:0;white-space:pre-wrap">${esc(p.notas)}</p></section>` : ''}
+      <section><p class="eyebrow">Sesiones (${st.todas.length})</p>
+      ${st.todas.length ? `<ul class="hist">${[...st.todas].reverse().map((s) => `<li><span class="num" style="font-size:20px;font-weight:600">${s.tempoLimpio ?? '—'}</span>
+        <span class="h-main"><span>${fmtDate(s.fecha)}</span>${s.minutos ? `<span class="muted">${s.minutos} min</span>` : ''}${s.tempoTrabajo && s.tempoTrabajo !== s.tempoLimpio ? `<span class="muted">metrónomo ${s.tempoTrabajo}</span>` : ''}${s.canaId && S.canas[s.canaId] ? `<span class="chip">caña ${S.canas[s.canaId].slot}</span>` : ''}${s.notas ? `<span class="muted">${esc(s.notas)}</span>` : ''}</span>
+        <button class="x" data-action="borrarSesion" data-id="${esc(s.id)}" data-confirm="1" aria-label="Borrar sesión">✕</button></li>`).join('')}</ul>` : '<p class="muted small">Pulsa «Estudiar ahora» para registrar la primera.</p>'}</section>`;
+  };
+  openSheet(S.piezas[id]?.titulo || 'Pieza', 'detail', render);
+}
+function openPiezaForm(id) {
+  const p = id ? S.piezas[id] : {titulo: '', agrupacion: FILTRO.agr !== 'Todas' ? FILTRO.agr : (S.config.agrupaciones || [])[0], evento: '', estado: 'estudio', tempoInicial: null, tempoObjetivo: null, fechaLimite: null, notas: ''};
+  const c = S.config;
+  openSheet(id ? 'Editar pieza' : 'Nueva pieza', 'form', () => `<div class="stack">
+    <div class="field"><label for="pf-t">Título</label><input type="text" id="pf-t" value="${esc(p.titulo)}"></div>
+    <div class="grid2"><div class="field"><label for="pf-a">Agrupación</label><select id="pf-a">${(c.agrupaciones || []).map((a) => `<option ${a === p.agrupacion ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select></div>
+    <div class="field"><label for="pf-e">Concierto</label><select id="pf-e"><option value="">Ninguno</option>${(c.eventos || []).map((e) => `<option value="${esc(e.id)}" ${e.id === p.evento ? 'selected' : ''}>${esc(e.nombre)}</option>`).join('')}</select></div></div>
+    <div class="grid2"><div class="field"><label for="pf-i">Tempo de partida (BPM)</label><input type="number" inputmode="numeric" id="pf-i" min="20" max="400" value="${p.tempoInicial ?? ''}"></div>
+    <div class="field"><label for="pf-o">Tempo objetivo (BPM)</label><input type="number" inputmode="numeric" id="pf-o" min="20" max="400" value="${p.tempoObjetivo ?? ''}"></div></div>
+    <div class="grid2"><div class="field"><label for="pf-l">Fecha límite propia</label><input type="date" id="pf-l" value="${esc(p.fechaLimite || '')}"></div>
+    <div class="field"><label for="pf-s">Estado</label><select id="pf-s">${[['estudio', 'En estudio'], ['lista', 'Lista'], ['archivada', 'Archivada']].map(([v, l]) => `<option value="${v}" ${v === p.estado ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>
+    <p class="muted small" style="margin:-4px 0 0">Si no pones fecha límite se usa la del concierto.</p>
+    <div class="field"><label for="pf-n">Notas (pasajes difíciles, compases…)</label><textarea id="pf-n">${esc(p.notas)}</textarea></div>
+    <button class="cta" data-action="guardarPieza" data-id="${esc(id || '')}">Guardar</button>
+    ${id ? '<button class="btn danger" data-action="borrarPieza" data-id="' + esc(id) + '" data-confirm="1">Borrar pieza y sus sesiones</button>' : ''}
+  </div>`);
+}
+
+/* ---------- detalle de caña ---------- */
+function openCana(id) {
+  const render = () => {
+    const c = S.canas[id]; if (!c) return null;
+    const s = statsCana(c), prot = S.config.rodaje || [];
+    const t = $('#sheet-title'); if (t) t.textContent = 'Caña ' + c.slot + (c.estado === 'retirada' ? ' (retirada)' : '');
+    const estadoChipC = c.estado === 'rodaje' ? '<span class="chip brass">En rodaje</span>' : c.estado === 'retirada' ? '<span class="chip">Retirada</span>' : '<span class="chip good">Activa</span>';
+    const rod = c.estado === 'rodaje' ? `<section><p class="eyebrow">Rodaje · minutos por día</p>
+        <div class="rodaje-steps">${prot.map((m, i) => `<span class="${i < s.rodHechos ? 'done' : i === s.rodHechos ? 'next' : ''}">${m}</span>`).join('')}</div>
+        <p class="small" style="margin:0">${s.rodHechos >= prot.length ? 'Rodaje completado.' : s.rodHoy ? 'Hoy ya está hecho. Mañana: ' + (prot[s.rodHechos] ?? '—') + ' min.' : 'Hoy toca: <b>' + s.rodSig + ' min</b>.'}</p>
+        <button class="btn" data-action="rodada" data-id="${esc(id)}">Dar por rodada</button></section>` : '';
+    return `<div class="chips">${estadoChipC}${c.estrenoAprox ? '<span class="chip">estreno aproximado</span>' : ''}</div>
+      <dl class="kv" style="margin-top:12px"><div><dt>Estreno</dt><dd>${c.estreno ? (c.estrenoAprox ? '~' : '') + fmtDate(c.estreno) : '—'}</dd></div><div><dt>${c.estado === 'retirada' ? 'Duró' : 'Edad'}</dt><dd>${fmtEdad(s.edad)}</dd></div><div><dt>Usos</dt><dd>${s.usos.length}</dd></div>
+      <div><dt>Última vez</dt><dd>${s.ultimo ? fmtDate(s.ultimo) : '—'}</dd></div><div><dt>Bien / mal</dt><dd><span style="color:var(--good)">${s.bien}</span> / <span style="color:var(--bad)">${s.mal}</span></dd></div><div><dt>Minutos</dt><dd>${s.min || '—'}</dd></div></dl>
+      ${rod}
+      ${c.estado !== 'retirada' ? `<div class="row-actions" style="margin-top:14px"><button class="btn primary" data-action="usoForm" data-id="${esc(id)}">Anotar uso</button><button class="btn danger" data-action="retirar" data-id="${esc(id)}" data-confirm="1">Retirar y estrenar nueva</button></div>` : `<p class="muted small">Retirada el ${fmtDate(c.retirada)}.</p>`}
+      <section><p class="eyebrow">Historial (${s.usos.length})</p>
+        ${s.usos.length ? `<ul class="hist">${[...s.usos].reverse().map((u) => `<li><i class="dot ${u.val || ''}" title="${u.val || 'sin valorar'}"></i>
+          <span class="h-main"><span>${fmtDate(u.f)}${u.aprox ? ' <span class="chip">fecha ≈</span>' : ''}</span>${u.min ? `<span class="muted">${u.min} min</span>` : ''}${u.rod ? '<span class="chip brass">rodaje</span>' : ''}${u.nota ? `<span class="muted">${esc(u.nota)}</span>` : ''}</span>
+          <button class="x" data-action="borrarUso" data-id="${esc(id)}" data-i="${u._i}" data-confirm="1" aria-label="Borrar uso">✕</button></li>`).join('')}</ul>` : '<p class="muted small">Sin usos anotados.</p>'}
+      </section>
+      <section><p class="eyebrow">Datos de la caña</p>
+        <div class="field"><label for="cd-e">Fecha de estreno</label><input type="date" id="cd-e" value="${esc(c.estreno || '')}"></div>
+        <div class="field"><label for="cd-n">Notas</label><textarea id="cd-n">${esc(c.notas || '')}</textarea></div>
+        <button class="btn" data-action="guardarCana" data-id="${esc(id)}">Guardar datos</button></section>`;
+  };
+  openSheet('Caña ' + (S.canas[id]?.slot ?? ''), 'detail', render);
+}
+let FORM_VAL = null;
+const valSeg = (cur) => `<div class="seg" role="group" aria-label="Valoración">${[['bien', 'Bien'], ['', 'Normal'], ['mal', 'Mal']].map(([v, l]) => `<button type="button" data-action="val" data-v="${v}" aria-pressed="${(cur || '') === v}">${l}</button>`).join('')}</div>`;
+function openUsoForm(id) {
+  const c = S.canas[id]; FORM_VAL = null;
+  const s = statsCana(c);
+  openSheet('Uso de la caña ' + c.slot, 'form', () => `<div class="stack">
+    <div class="grid2"><div class="field"><label for="uf-f">Fecha</label><input type="date" id="uf-f" value="${todayISO()}"></div>
+    <div class="field"><label for="uf-m">Minutos</label><input type="number" inputmode="numeric" id="uf-m" min="1" max="600" value="${c.estado === 'rodaje' && s.rodSig ? s.rodSig : ''}"></div></div>
+    <div class="field"><span class="lbl">¿Cómo ha respondido?</span>${valSeg(null)}</div>
+    <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="uf-r" ${c.estado === 'rodaje' ? 'checked' : ''}> Sesión de rodaje</label>
+    <div class="field"><label for="uf-n">Nota</label><input type="text" id="uf-n" placeholder="ensayo, concierto, dura, sucia…"></div>
+    <button class="cta" data-action="guardarUso" data-id="${esc(id)}">Guardar uso</button></div>`);
+}
+async function addUso(canaId, u) {
+  const c = S.canas[canaId]; if (!c) return;
+  const usos = [...(c.usos || [])];
+  const i = usos.findIndex((x) => x.f === u.f);
+  if (i >= 0) {
+    const x = {...usos[i]};
+    x.min = ((x.min || 0) + (u.min || 0)) || null;
+    if (u.val) x.val = u.val;
+    if (u.nota) x.nota = [x.nota, u.nota].filter(Boolean).join(' · ');
+    x.rod = !!(x.rod || u.rod); x.aprox = false; usos[i] = x;
+  } else usos.push({f: u.f, min: u.min ?? null, rod: !!u.rod, val: u.val || null, nota: u.nota || '', aprox: false});
+  usos.sort((a, b) => a.f.localeCompare(b.f));
+  await put('canas', canaId, {...c, usos});
+}
+
+/* ---------- sesión + metrónomo ---------- */
+const Met = {
+  ctx: null, bpm: 100, beats: 4, sub: 1, accent: true, playing: false, next: 0, idx: 0, timer: null, wake: null,
+  start() {
+    try { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { toast('Este navegador no permite audio.'); return; }
+    this.ctx.resume(); this.playing = true; this.idx = 0; this.next = this.ctx.currentTime + 0.08;
+    this.timer = setInterval(() => this.tick(), 25);
+    if (navigator.wakeLock) navigator.wakeLock.request('screen').then((w) => { this.wake = w; }).catch(() => {});
+    updPlay();
+  },
+  stop() {
+    clearInterval(this.timer); this.timer = null; this.playing = false;
+    if (this.wake) { this.wake.release().catch(() => {}); this.wake = null; }
+    updPlay();
+  },
+  tick() {
+    const spb = 60 / this.bpm / this.sub;
+    while (this.next < this.ctx.currentTime + 0.12) {
+      this.click(this.next, this.idx);
+      const i = this.idx, delay = Math.max(0, (this.next - this.ctx.currentTime) * 1000);
+      if (i % this.sub === 0) setTimeout(() => flashBeat(Math.floor(i / this.sub)), delay);
+      this.next += spb; this.idx = (this.idx + 1) % (this.beats * this.sub);
+    }
+  },
+  click(t, i) {
+    const main = i % this.sub === 0, acc = this.accent && i === 0;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = 'square'; o.frequency.value = acc ? 1760 : main ? 1320 : 880;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(main ? 0.35 : 0.12, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+    o.connect(g).connect(this.ctx.destination); o.start(t); o.stop(t + 0.06);
+  },
+};
+function flashBeat(b) {
+  const dots = document.querySelectorAll('#m-beats i'); if (!dots.length) return;
+  dots.forEach((d, k) => d.classList.toggle('on', k === b));
+  setTimeout(() => dots[b] && dots[b].classList.remove('on'), 110);
+}
+function updPlay() { const b = $('#m-play'); if (b) b.textContent = Met.playing ? '■ Parar' : '▶ Metrónomo'; }
+const SES = {start: 0, acc: 0, running: false, clock: null, limpioEdited: false, minEdited: false, taps: []};
+const elapsed = () => SES.acc + (SES.running ? Date.now() - SES.start : 0);
+function tickClock() {
+  const e = Math.floor(elapsed() / 1000), el = $('#s-clock'); if (!el) return;
+  el.textContent = pad(Math.floor(e / 60)) + ':' + pad(e % 60);
+  if (!SES.minEdited) { const m = $('#s-min'); if (m) m.value = Math.max(1, Math.round(e / 60)); }
+}
+function setBpm(v) {
+  Met.bpm = Math.max(30, Math.min(300, Math.round(v)));
+  const o = $('#m-bpm-n'); if (o) o.textContent = Met.bpm;
+  const r = $('#m-range'); if (r) r.value = Met.bpm;
+  if (!SES.limpioEdited) { const l = $('#s-limpio'); if (l) l.value = Met.bpm; }
+}
+function tempoSugerido(pid) {
+  const p = S.piezas[pid]; if (!p) return null;
+  const st = statsPieza(p); return st.actual ?? p.tempoInicial ?? null;
+}
+function piezaInfo(pid) {
+  const p = S.piezas[pid]; if (!p) return 'Sin pieza: solo se anota el uso de la caña.';
+  const st = statsPieza(p);
+  return [st.actual != null ? 'Último tempo limpio ' + st.actual : 'Primera sesión', st.obj != null ? 'objetivo ' + st.obj : 'sin objetivo'].join(' · ');
+}
+function openSesion(piezaId) {
+  const act = canasActuales(), sug = sugerida();
+  const piezas = Object.values(S.piezas).filter((p) => p.estado !== 'archivada');
+  const agrs = [...new Set(piezas.map((p) => p.agrupacion))];
+  FORM_VAL = null;
+  Object.assign(SES, {start: Date.now(), acc: 0, running: true, limpioEdited: false, minEdited: false, taps: []});
+  const t0 = tempoSugerido(piezaId); Met.bpm = t0 || Met.bpm || 100;
+  openSheet('Sesión de estudio', 'form', () => `<div class="stack">
+    <div class="field"><label for="s-pieza">Pieza</label><select id="s-pieza"><option value="">Sin pieza (calentamiento, escalas…)</option>
+      ${agrs.map((a) => `<optgroup label="${esc(a)}">${piezas.filter((p) => p.agrupacion === a).sort((x, y) => (x.orden ?? 99) - (y.orden ?? 99)).map((p) => `<option value="${esc(p.id)}" ${p.id === piezaId ? 'selected' : ''}>${esc(p.titulo)}</option>`).join('')}</optgroup>`).join('')}
+    </select><span class="small muted" id="s-info">${esc(piezaInfo(piezaId))}</span></div>
+    <div class="met">
+      <div class="met-beats" id="m-beats">${'<i></i>'.repeat(Met.beats)}</div>
+      <div class="met-bpm"><button data-action="bpm" data-d="-5" aria-label="Bajar 5">−5</button><button data-action="bpm" data-d="-1" aria-label="Bajar 1">−1</button>
+        <output id="m-bpm"><span id="m-bpm-n">${Met.bpm}</span><small>BPM</small></output>
+        <button data-action="bpm" data-d="1" aria-label="Subir 1">+1</button><button data-action="bpm" data-d="5" aria-label="Subir 5">+5</button></div>
+      <input type="range" id="m-range" min="30" max="300" value="${Met.bpm}" aria-label="Tempo">
+      <div class="met-row"><button class="play" id="m-play" data-action="play">${Met.playing ? '■ Parar' : '▶ Metrónomo'}</button><button data-action="tap">Tap</button></div>
+      <div class="met-row">
+        <select id="m-beatsSel" aria-label="Compás">${[2, 3, 4, 5, 6, 7].map((n) => `<option value="${n}" ${n === Met.beats ? 'selected' : ''}>${n} pulsos</option>`).join('')}</select>
+        <select id="m-sub" aria-label="Subdivisión">${[[1, 'Negras'], [2, 'Corcheas'], [3, 'Tresillos'], [4, 'Semicorcheas']].map(([v, l]) => `<option value="${v}" ${v === Met.sub ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <label><input type="checkbox" id="m-acc" ${Met.accent ? 'checked' : ''}> Acento</label></div>
+    </div>
+    <div class="card clock"><div><span class="lbl">Tiempo de estudio</span><br><b id="s-clock">00:00</b></div><button class="btn" id="s-pause" data-action="clock">Pausar</button></div>
+    <div class="field"><span class="lbl">Caña</span><div class="reed-pick">
+      ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((slot) => { const c = act[slot]; if (!c) return ''; const rs = statsCana(c); const tag = c.estado === 'rodaje' ? (rs.rodSig != null ? rs.rodSig + ' min' : 'rodaje') : (sug && sug.id === c.id ? 'hoy' : ''); return `<label><input type="radio" name="s-cana" value="${esc(c.id)}" ${sug && sug.id === c.id ? 'checked' : ''}><b>${slot}</b>${tag || '&nbsp;'}</label>`; }).join('')}
+      <label><input type="radio" name="s-cana" value=""><b>–</b>ninguna</label></div></div>
+    <div class="grid2"><div class="field"><label for="s-limpio">Tempo limpio (BPM)</label><input type="number" inputmode="numeric" id="s-limpio" value="${Met.bpm}"></div>
+      <div class="field"><label for="s-min">Minutos</label><input type="number" inputmode="numeric" id="s-min" value="1" min="1"></div></div>
+    <p class="muted small" style="margin:-4px 0 0">Tempo limpio: el más rápido al que el pasaje ha salido sin fallos.</p>
+    <div class="field"><span class="lbl">¿Cómo ha respondido la caña?</span>${valSeg(null)}</div>
+    <div class="field"><label for="s-notas">Notas</label><textarea id="s-notas" placeholder="compases trabajados, articulación…"></textarea></div>
+    <div class="field"><label for="s-fecha">Fecha</label><input type="date" id="s-fecha" value="${todayISO()}"></div>
+    <button class="cta" data-action="guardarSesion">Guardar sesión</button>
+  </div>`, () => { Met.stop(); clearInterval(SES.clock); SES.running = false; });
+  clearInterval(SES.clock); SES.clock = setInterval(tickClock, 1000);
+}
+async function guardarSesion() {
+  const piezaId = $('#s-pieza').value;
+  const canaId = document.querySelector('input[name="s-cana"]:checked')?.value || '';
+  const fecha = $('#s-fecha').value || todayISO();
+  const minutos = intOrNull($('#s-min').value), limpio = intOrNull($('#s-limpio').value), notas = $('#s-notas').value.trim();
+  if (!piezaId && !canaId) { toast('Elige una pieza o una caña.'); return; }
+  const sid = uid();
+  const ok = await safe(async () => {
+    if (piezaId) await put('sesiones', sid, {fecha, piezaId, tempoTrabajo: Met.bpm, tempoLimpio: limpio, minutos, canaId: canaId || null, notas, creada: new Date().toISOString()});
+    if (canaId) await addUso(canaId, {f: fecha, min: minutos, rod: S.canas[canaId]?.estado === 'rodaje', val: FORM_VAL, nota: piezaId ? '' : notas});
+  }, 'Sesión guardada');
+  if (ok) closeSheet();
+}
+
+/* ============ acciones ============ */
+function leerAjustes() {
+  const list = (v) => String(v || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const val = (id, def) => { const el = $('#' + id); return el ? el.value.trim() : def; };
+  const rod = list(val('cf-rod', (S.config.rodaje || []).join(','))).map(Number).filter((n) => n > 0);
+  const agr = list(val('cf-agr', (S.config.agrupaciones || []).join(',')));
+  const eventos = (S.config.eventos || []).map((e, i) => ({...e, nombre: val('ev-n-' + i, e.nombre) || e.nombre,
+    agrupacion: val('ev-a-' + i, e.agrupacion), fecha: val('ev-f-' + i, e.fecha || '') || null}));
+  return {...S.config, instrumento: val('cf-inst', S.config.instrumento), marca: val('cf-marca', S.config.marca),
+    modelo: val('cf-modelo', S.config.modelo), dureza: val('cf-dur', S.config.dureza),
+    rodaje: rod.length ? rod : DEFAULT_CONFIG.rodaje, agrupaciones: agr.length ? agr : DEFAULT_CONFIG.agrupaciones, eventos};
+}
+const ACTIONS = {
+  tab(el) { TAB = el.dataset.tab; try { localStorage.setItem('atril-tab', TAB); } catch (e) { /* ignorar */ } if (SHEET) closeSheet(); render(); window.scrollTo(0, 0); },
+  close() { closeSheet(); },
+  sesion(el) { openSesion(el.dataset.id || ''); },
+  pieza(el) { openPieza(el.dataset.id); },
+  piezaForm(el) { openPiezaForm(el.dataset.id || ''); },
+  fagr(el) { FILTRO.agr = el.dataset.v; render(); },
+  festado(el) { FILTRO.estado = el.dataset.v; render(); },
+  async guardarPieza(el) {
+    const titulo = $('#pf-t').value.trim(); if (!titulo) { toast('Escribe el título.'); return; }
+    const id = el.dataset.id || 'p' + uid();
+    const prev = S.piezas[id] || {creada: todayISO(), orden: 99};
+    const ok = await safe(() => put('piezas', id, {...prev, titulo, agrupacion: $('#pf-a').value, evento: $('#pf-e').value || null,
+      tempoInicial: intOrNull($('#pf-i').value), tempoObjetivo: intOrNull($('#pf-o').value), fechaLimite: $('#pf-l').value || null,
+      estado: $('#pf-s').value, notas: $('#pf-n').value.trim()}), 'Pieza guardada');
+    if (ok) openPieza(id);
+  },
+  async borrarPieza(el) {
+    const id = el.dataset.id;
+    const ok = await safe(async () => { for (const s of sesionesDe(id)) await del('sesiones', s.id); await del('piezas', id); }, 'Pieza borrada');
+    if (ok) closeSheet();
+  },
+  async borrarSesion(el) { await safe(() => del('sesiones', el.dataset.id), 'Sesión borrada'); },
+  cana(el) { openCana(el.dataset.id); },
+  usoForm(el) { openUsoForm(el.dataset.id); },
+  val(el) { FORM_VAL = el.dataset.v || null; el.parentElement.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b === el)); },
+  async guardarUso(el) {
+    const id = el.dataset.id;
+    const ok = await safe(() => addUso(id, {f: $('#uf-f').value || todayISO(), min: intOrNull($('#uf-m').value), rod: $('#uf-r').checked, val: FORM_VAL, nota: $('#uf-n').value.trim()}), 'Uso anotado');
+    if (ok) openCana(id);
+  },
+  async borrarUso(el) {
+    const c = S.canas[el.dataset.id], i = +el.dataset.i;
+    const usos = (c.usos || []).filter((_, k) => k !== i);
+    await safe(() => put('canas', c.id, {...c, usos}), 'Uso borrado');
+  },
+  async rodada(el) { const c = S.canas[el.dataset.id]; await safe(() => put('canas', c.id, {...c, estado: 'activa'}), 'Caña ' + c.slot + ' rodada'); },
+  async retirar(el) {
+    const c = S.canas[el.dataset.id], hoy = todayISO(), nid = 'c' + c.slot + '-' + uid();
+    const ok = await safe(async () => {
+      await put('canas', c.id, {...c, estado: 'retirada', retirada: hoy});
+      await put('canas', nid, {slot: c.slot, estado: 'rodaje', estreno: hoy, estrenoAprox: false, retirada: null, notas: '', usos: []});
+    }, 'Caña ' + c.slot + ' nueva, en rodaje');
+    if (ok) openCana(nid);
+  },
+  async estrenar(el) {
+    const slot = +el.dataset.slot, nid = 'c' + slot + '-' + uid();
+    const ok = await safe(() => put('canas', nid, {slot, estado: 'rodaje', estreno: todayISO(), estrenoAprox: false, retirada: null, notas: '', usos: []}), 'Caña ' + slot + ' estrenada');
+    if (ok) openCana(nid);
+  },
+  async guardarCana(el) {
+    const c = S.canas[el.dataset.id], e = $('#cd-e').value || null;
+    await safe(() => put('canas', c.id, {...c, estreno: e, estrenoAprox: e === c.estreno ? !!c.estrenoAprox : false, notas: $('#cd-n').value.trim()}), 'Datos guardados');
+  },
+  bpm(el) { setBpm(Met.bpm + +el.dataset.d); },
+  play() { Met.playing ? Met.stop() : Met.start(); },
+  tap() {
+    const now = performance.now();
+    SES.taps = SES.taps.filter((t) => now - t < 2500); SES.taps.push(now);
+    if (SES.taps.length >= 2) { const iv = SES.taps.slice(-5); const d = (iv[iv.length - 1] - iv[0]) / (iv.length - 1); setBpm(60000 / d); }
+  },
+  clock() {
+    if (SES.running) { SES.acc = elapsed(); SES.running = false; } else { SES.start = Date.now(); SES.running = true; }
+    $('#s-pause').textContent = SES.running ? 'Pausar' : 'Seguir'; tickClock();
+  },
+  guardarSesion() { guardarSesion(); },
+  addEvento() {
+    const cfg = leerAjustes();
+    cfg.eventos.push({id: 'ev' + uid(), nombre: 'Nuevo concierto', agrupacion: cfg.agrupaciones[0] || '', fecha: null});
+    safe(() => putConfig(cfg));
+  },
+  borrarEvento(el) {
+    const i = +el.dataset.i, cfg = leerAjustes();
+    cfg.eventos = cfg.eventos.filter((_, k) => k !== i);
+    safe(() => putConfig(cfg), 'Cita quitada');
+  },
+  guardarAjustes() {
+    if (document.activeElement) document.activeElement.blur();
+    safe(() => putConfig(leerAjustes()), 'Ajustes guardados');
+  },
+  async exportar() {
+    const data = {app: 'atril-y-canas', exportado: nowISO(), origen: TARGET, config: S.config, piezas: Object.values(S.piezas), sesiones: Object.values(S.sesiones), canas: Object.values(S.canas)};
+    const txt = JSON.stringify(data, null, 1), name = 'atril-y-canas-' + todayISO() + '.json';
+    const hecho = () => { try { localStorage.setItem('atril-ultima-copia', todayISO()); } catch (e) { /* ignorar */ } toast('Copia exportada'); render(); };
+    if (TARGET === 'pwa') {
+      const file = new File([txt], name, {type: 'application/json'});
+      if (navigator.canShare && navigator.canShare({files: [file]})) {
+        try { await navigator.share({files: [file], title: 'Copia Atril y Cañas'}); hecho(); return; }
+        catch (e) { if (e && e.name === 'AbortError') return; }
+      }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); hecho(); return;
+    }
+    let dl = null;
+    try { if (window.claude && window.claude.use) dl = await window.claude.use('downloads'); } catch (e) { dl = null; }
+    if (dl) { try { await dl.save({filename: name, data: txt}); hecho(); return; } catch (e) { if (e && e.code === 'declined') return; } }
+    $('#export-box').innerHTML = `<div class="field"><label for="exp">Copia este texto y guárdalo</label><textarea id="exp" readonly style="min-height:140px">${esc(txt)}</textarea></div><button class="btn" data-action="copiar">Copiar</button>`;
+  },
+  copiar() {
+    const t = $('#exp');
+    navigator.clipboard.writeText(t.value).then(() => toast('Copiado'), () => { t.focus(); t.select(); toast('Selecciona y copia el texto'); });
+  },
+  async importar(el) {
+    let o;
+    try { o = JSON.parse($('#imp').value); } catch (e) { toast('El texto no es un JSON válido.'); return; }
+    if (!o || !Array.isArray(o.piezas) || !Array.isArray(o.canas)) { toast('Falta la lista de piezas o de cañas.'); return; }
+    const modo = el.dataset.modo;
+    const nuevo = {piezas: o.piezas, sesiones: o.sesiones || [], canas: o.canas};
+    let cambios = 0;
+    const ok = await safe(async () => {
+      for (const c of COLLS) {
+        if (modo === 'reemplazar') {
+          const ids = new Set(nuevo[c].map((x) => x.id));
+          for (const id of Object.keys(S[c])) if (!ids.has(id)) { await del(c, id); cambios++; }
+        }
+        for (const x of nuevo[c]) {
+          if (!x || !x.id) continue;
+          const cur = S[c][x.id];
+          const res = modo === 'reemplazar' ? x : combinarDoc(c, cur, x);
+          if (cur && JSON.stringify(body(cur)) === JSON.stringify(body(res))) continue;
+          await putRaw(c, x.id, res); cambios++;
+        }
+      }
+      if (o.config && (modo === 'reemplazar' || String(o.config.mod || '') > String(S.config.mod || ''))) { await putConfigRaw(o.config); cambios++; }
+    });
+    if (ok) { toast(cambios ? `Importado: ${cambios} cambios` : 'No había nada nuevo'); $('#imp').value = ''; }
+  },
+};
+
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action]'); if (!el) return;
+  if (el.dataset.confirm && !el.dataset.armed) {
+    el.dataset.armed = '1'; el.dataset.label = el.innerHTML;
+    el.innerHTML = el.classList.contains('x') ? '¿Sí?' : '¿Seguro? Toca otra vez';
+    setTimeout(() => { if (el.isConnected && el.dataset.armed) { delete el.dataset.armed; el.innerHTML = el.dataset.label; } }, 3500);
+    return;
+  }
+  if (el.dataset.armed) { delete el.dataset.armed; el.innerHTML = el.dataset.label; }
+  const fn = ACTIONS[el.dataset.action]; if (fn) fn(el, e);
+});
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (t.id === 'm-range') setBpm(+t.value);
+  if (t.id === 's-limpio') SES.limpioEdited = true;
+  if (t.id === 's-min') SES.minEdited = true;
+});
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.id === 's-pieza') { $('#s-info').textContent = piezaInfo(t.value); const v = tempoSugerido(t.value); if (v && !Met.playing) setBpm(v); }
+  if (t.id === 'm-beatsSel') { Met.beats = +t.value; Met.idx = 0; $('#m-beats').innerHTML = '<i></i>'.repeat(Met.beats); }
+  if (t.id === 'm-sub') { Met.sub = +t.value; Met.idx = 0; }
+  if (t.id === 'm-acc') Met.accent = t.checked;
+  if (t.id === 'imp-file' && t.files[0]) { const r = new FileReader(); r.onload = () => { $('#imp').value = r.result; toast('Archivo cargado: pulsa «Combinar con mis datos»'); }; r.readAsText(t.files[0]); }
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && SHEET) closeSheet(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleRender(); });
+
+render();
+initStore();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>
