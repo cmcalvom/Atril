@@ -1,5 +1,5 @@
 // Service worker de Atril y Cañas: la app funciona sin conexión.
-const CACHE = 'atril-2026-09-24-1';
+const CACHE = 'atril-2026-09-26-1';
 const FONTS = 'atril-fonts';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 

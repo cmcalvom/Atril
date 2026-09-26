@@ -345,7 +345,8 @@ const ready = () => S.mode === 'local' || (S.mode === 'db' && ['piezas', 'sesion
 
 /* ============ cálculos ============ */
 const eventoDe = (p) => (S.config.eventos || []).find((e) => e.id === p.evento) || null;
-const limiteDe = (p) => p.fechaLimite || eventoDe(p)?.fecha || null;
+function limiteDeEvento(ev) { return ev ? nextOcurrencia(ev, todayISO()) : null; }
+const limiteDe = (p) => p.fechaLimite || limiteDeEvento(eventoDe(p));
 const sesionesDe = (pid) => Object.values(S.sesiones).filter((s) => s.piezaId === pid)
   .sort((a, b) => a.fecha.localeCompare(b.fecha) || String(a.creada || '').localeCompare(String(b.creada || '')));
 
@@ -401,10 +402,117 @@ function sugerida() {
   return act[0] || null;
 }
 const enRodaje = () => Object.values(canasActuales()).filter((c) => c.estado === 'rodaje').sort((a, b) => a.slot - b.slot);
+
+/* ---- citas: puntuales y periódicas (calendario) ---- */
+const DOW_ICS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+const DOW_PLURAL = {domingo: 'domingos', lunes: 'lunes', martes: 'martes', miércoles: 'miércoles', jueves: 'jueves', viernes: 'viernes', sábado: 'sábados'};
+function ultimoDiaMes(y, m) { return new Date(y, m + 1, 0).getDate(); }
+function fechaDelMes(y, m, dia) { const d = Math.min(dia, ultimoDiaMes(y, m)); return y + '-' + pad(m + 1) + '-' + pad(d); }
+function primerOcurrencia(ev) {
+  const desde = ev.desde || todayISO();
+  if (ev.frecuencia === 'mensual') {
+    const diaMes = Math.min(Math.max(Number(ev.diaMes) || 1, 1), 31);
+    let d = parseISO(desde), y = d.getFullYear(), m = d.getMonth(), cand = fechaDelMes(y, m, diaMes), guard = 0;
+    while (cand < desde && guard < 24) { m++; if (m > 11) { m = 0; y++; } cand = fechaDelMes(y, m, diaMes); guard++; }
+    return cand;
+  }
+  const dow = Number(ev.diaSemana) || 0, d = parseISO(desde), diff = (dow - d.getDay() + 7) % 7;
+  return addDays(desde, diff);
+}
+function nextOcurrencia(ev, fromISO) {
+  if ((ev.tipo || 'puntual') !== 'periodico') return ev.fecha || null;
+  if (!ev.desde) return null;
+  const start = primerOcurrencia(ev);
+  if (ev.hasta && start > ev.hasta) return null;
+  if (start >= fromISO) return start;
+  if (ev.frecuencia === 'mensual') {
+    const diaMes = Math.min(Math.max(Number(ev.diaMes) || 1, 1), 31);
+    let d = parseISO(start), y = d.getFullYear(), m = d.getMonth(), cand = start, guard = 0;
+    while (cand < fromISO && guard < 600) { m++; if (m > 11) { m = 0; y++; } cand = fechaDelMes(y, m, diaMes); guard++; }
+    return ev.hasta && cand > ev.hasta ? null : cand;
+  }
+  const step = ev.frecuencia === 'quincenal' ? 14 : 7, n = Math.max(0, Math.ceil(daysBetween(start, fromISO) / step)), next = addDays(start, n * step);
+  return ev.hasta && next > ev.hasta ? null : next;
+}
+function resumenRecurrencia(ev) {
+  let s;
+  if (ev.frecuencia === 'mensual') s = 'Día ' + (ev.diaMes || 1) + ' de cada mes';
+  else { const dia = DOW_PLURAL[DOW[Number(ev.diaSemana) || 0]]; s = (ev.frecuencia === 'quincenal' ? 'Cada 2 semanas, ' : 'Todos los ') + dia; }
+  if (ev.hasta) s += ' hasta ' + fmtDate(ev.hasta);
+  return s;
+}
 function proximoEvento() {
   const hoy = todayISO(), evs = S.config.eventos || [];
-  const fut = evs.filter((e) => e.fecha && e.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha));
-  return fut[0] || evs.find((e) => !e.fecha) || null;
+  const conFecha = evs.map((e) => ({e, d: nextOcurrencia(e, hoy)})).filter((x) => x.d);
+  const fut = conFecha.filter((x) => x.d >= hoy).sort((a, b) => a.d.localeCompare(b.d));
+  if (fut.length) return {...fut[0].e, _next: fut[0].d};
+  return evs.find((e) => !nextOcurrencia(e, hoy)) || null;
+}
+
+/* ---- generación de archivos .ics ---- */
+function icsEscape(t) { return String(t ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n'); }
+function foldICS(line) {
+  if (line.length <= 74) return line;
+  let out = line.slice(0, 74), rest = line.slice(74);
+  while (rest.length) { out += '\r\n ' + rest.slice(0, 73); rest = rest.slice(73); }
+  return out;
+}
+function dtstamp() { return new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'; }
+function buildVEvent(ev) {
+  const tipo = ev.tipo || 'puntual';
+  const startDate = tipo === 'periodico' ? primerOcurrencia(ev) : ev.fecha;
+  if (!startDate) return null;
+  const conHora = !!ev.hora;
+  const lines = ['BEGIN:VEVENT', 'UID:atril-' + ev.id + '@atrilycanas', 'DTSTAMP:' + dtstamp()];
+  if (conHora) {
+    const [hh, mm] = ev.hora.split(':').map(Number);
+    const startDt = parseISO(startDate); startDt.setHours(hh, mm, 0, 0);
+    const dur = Number(ev.duracion) > 0 ? Number(ev.duracion) : 2;
+    const endDt = new Date(startDt.getTime() + dur * 3600000);
+    const fmtDT = (d) => d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + 'T' + pad(d.getHours()) + pad(d.getMinutes()) + '00';
+    lines.push('DTSTART:' + fmtDT(startDt), 'DTEND:' + fmtDT(endDt));
+  } else {
+    lines.push('DTSTART;VALUE=DATE:' + startDate.replace(/-/g, ''), 'DTEND;VALUE=DATE:' + addDays(startDate, 1).replace(/-/g, ''));
+  }
+  lines.push('SUMMARY:' + icsEscape(ev.nombre || 'Cita'));
+  if (ev.agrupacion) lines.push('DESCRIPTION:' + icsEscape(ev.agrupacion));
+  if (tipo === 'periodico') {
+    let rrule = ev.frecuencia === 'mensual' ? 'FREQ=MONTHLY;BYMONTHDAY=' + (ev.diaMes || 1)
+      : 'FREQ=WEEKLY;INTERVAL=' + (ev.frecuencia === 'quincenal' ? 2 : 1) + ';BYDAY=' + DOW_ICS[Number(ev.diaSemana) || 0];
+    if (ev.hasta) rrule += ';UNTIL=' + (conHora ? ev.hasta.replace(/-/g, '') + 'T235900' : ev.hasta.replace(/-/g, ''));
+    lines.push('RRULE:' + rrule);
+  }
+  lines.push('END:VEVENT');
+  return lines.map(foldICS).join('\r\n');
+}
+function buildICS(eventos) {
+  const body = eventos.map(buildVEvent).filter(Boolean);
+  if (!body.length) return null;
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Atril y Cañas//ES', 'CALSCALE:GREGORIAN', ...body, 'END:VCALENDAR'].join('\r\n') + '\r\n';
+}
+function slugify(t) {
+  return String(t || 'cita').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'cita';
+}
+async function descargarICS(eventos, nombreBase) {
+  const ics = buildICS(eventos);
+  if (!ics) { toast('Esa cita todavía no tiene fecha.'); return; }
+  const name = slugify(nombreBase) + '.ics';
+  if (TARGET === 'pwa') {
+    const file = new File([ics], name, {type: 'text/calendar'});
+    if (navigator.canShare && navigator.canShare({files: [file]})) {
+      try { await navigator.share({files: [file], title: 'Añadir al calendario'}); return; }
+      catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('Ábrelo con tu app de calendario'); return;
+  }
+  // La versión de Claude no puede descargar un .ics (la plataforma no admite esa extensión): se ofrece para copiar.
+  openSheet('Añadir al calendario', 'form', () => `<div class="stack">
+    <p class="muted small" style="margin:0">Copia este texto, guárdalo en un archivo con extensión <b>.ics</b> y ábrelo con tu calendario. Desde el móvil es más fácil: usa este mismo botón en la app instalada.</p>
+    <div class="field"><label for="ics-txt">Contenido del archivo .ics</label><textarea id="ics-txt" readonly style="min-height:220px;font-family:monospace;font-size:12px">${esc(ics)}</textarea></div>
+    <button class="btn" data-action="copiarIcs">Copiar</button>
+  </div>`);
 }
 const ORDEN_ESTADO = {riesgo: 0, ok: 1, sinTempo: 2, listo: 3};
 function ultimaCopia() { try { return localStorage.getItem('atril-ultima-copia'); } catch (e) { return null; } }
@@ -452,9 +560,9 @@ const VIEWS = {
       .sort((a, b) => (ORDEN_ESTADO[a.st.estado] - ORDEN_ESTADO[b.st.estado]) || ((a.st.pct ?? 2) - (b.st.pct ?? 2)) || ((a.p.orden ?? 99) - (b.p.orden ?? 99)));
     let evHTML = '<div class="card hero-ev"><p class="eyebrow">Próxima cita</p><p class="muted small">Añade conciertos o ensayos en Ajustes.</p></div>';
     if (ev) {
-      const faltan = ev.fecha ? daysBetween(hoy, ev.fecha) : null;
+      const faltan = ev._next ? daysBetween(hoy, ev._next) : null;
       evHTML = `<div class="card hero-ev stack" style="gap:4px"><p class="eyebrow">${esc(ev.nombre)}</p>
-        ${faltan != null ? `<div class="big">${faltan}</div><div class="lbl">${faltan === 1 ? 'día' : 'días'} · ${fmtDate(ev.fecha)}</div>`
+        ${faltan != null ? `<div class="big">${faltan}</div><div class="lbl">${faltan === 1 ? 'día' : 'días'} · ${fmtDate(ev._next)}</div>`
         : `<div class="lbl">Sin fecha todavía</div><button class="btn" data-action="tab" data-tab="mas" style="margin-top:6px">Añadir fecha</button>`}</div>`;
     }
     const s = sug ? statsCana(sug) : null;
@@ -513,12 +621,46 @@ const VIEWS = {
 
   mas() {
     const c = S.config;
-    const evs = (c.eventos || []).map((e, i) => `<div class="card stack" style="gap:8px">
+    const evs = (c.eventos || []).map((e, i) => {
+      const tipo = e.tipo || 'puntual', frecuencia = e.frecuencia || 'semanal', dsem = e.diaSemana ?? new Date().getDay();
+      return `<div class="card stack" style="gap:8px">
         <div class="field"><label for="ev-n-${i}">Nombre</label><input type="text" id="ev-n-${i}" value="${esc(e.nombre)}"></div>
-        <div class="grid2"><div class="field"><label for="ev-a-${i}">Agrupación</label><select id="ev-a-${i}">${(c.agrupaciones || []).map((a) => `<option ${a === e.agrupacion ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select></div>
-        <div class="field"><label for="ev-f-${i}">Fecha</label><input type="date" id="ev-f-${i}" value="${esc(e.fecha || '')}"></div></div>
-        <button class="btn danger" data-action="borrarEvento" data-i="${i}" data-confirm="1">Quitar</button></div>`).join('');
-    return `<section style="margin-top:0"><h2>Conciertos y citas</h2>${evs || '<p class="muted small">Sin citas.</p>'}<button class="btn" data-action="addEvento">+ Añadir cita</button></section>
+        <div class="grid2">
+          <div class="field"><label for="ev-a-${i}">Agrupación</label><select id="ev-a-${i}">${(c.agrupaciones || []).map((a) => `<option ${a === e.agrupacion ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select></div>
+          <div class="field"><label for="ev-tipo-${i}">Tipo</label><select id="ev-tipo-${i}" data-action-change="tipoEvento" data-i="${i}">
+            <option value="puntual" ${tipo === 'puntual' ? 'selected' : ''}>Puntual (una fecha)</option>
+            <option value="periodico" ${tipo === 'periodico' ? 'selected' : ''}>Periódico (se repite)</option>
+          </select></div>
+        </div>
+        <div id="ev-puntual-${i}" ${tipo === 'periodico' ? 'hidden' : ''}>
+          <div class="field"><label for="ev-f-${i}">Fecha</label><input type="date" id="ev-f-${i}" value="${esc(e.fecha || '')}"></div>
+        </div>
+        <div id="ev-periodico-${i}" class="stack" style="gap:8px" ${tipo === 'puntual' ? 'hidden' : ''}>
+          <div class="grid2">
+            <div class="field"><label for="ev-frec-${i}">Frecuencia</label><select id="ev-frec-${i}" data-action-change="frecEvento" data-i="${i}">
+              <option value="semanal" ${frecuencia === 'semanal' ? 'selected' : ''}>Semanal</option>
+              <option value="quincenal" ${frecuencia === 'quincenal' ? 'selected' : ''}>Quincenal</option>
+              <option value="mensual" ${frecuencia === 'mensual' ? 'selected' : ''}>Mensual</option>
+            </select></div>
+            <div class="field" id="ev-dsem-wrap-${i}" ${frecuencia === 'mensual' ? 'hidden' : ''}><label for="ev-dsem-${i}">Día</label><select id="ev-dsem-${i}">${DOW.map((d, k) => `<option value="${k}" ${k === Number(dsem) ? 'selected' : ''}>${d[0].toUpperCase() + d.slice(1)}</option>`).join('')}</select></div>
+            <div class="field" id="ev-dmes-wrap-${i}" ${frecuencia !== 'mensual' ? 'hidden' : ''}><label for="ev-dmes-${i}">Día del mes</label><input type="number" id="ev-dmes-${i}" min="1" max="31" value="${e.diaMes || 1}"></div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label for="ev-desde-${i}">Desde</label><input type="date" id="ev-desde-${i}" value="${esc(e.desde || todayISO())}"></div>
+            <div class="field"><label for="ev-hasta-${i}">Hasta (opcional)</label><input type="date" id="ev-hasta-${i}" value="${esc(e.hasta || '')}"></div>
+          </div>
+          <p class="muted small" id="ev-resumen-${i}" style="margin:0">${esc(resumenRecurrencia({...e, tipo: 'periodico', frecuencia, diaSemana: dsem}))} · próxima: ${fmtDate(nextOcurrencia({...e, tipo: 'periodico', frecuencia, diaSemana: dsem, desde: e.desde || todayISO()}, todayISO()))}</p>
+        </div>
+        <div class="grid2">
+          <div class="field"><label for="ev-h-${i}">Hora (opcional)</label><input type="time" id="ev-h-${i}" value="${esc(e.hora || '')}"></div>
+          <div class="field"><label for="ev-dur-${i}">Duración (horas)</label><input type="number" id="ev-dur-${i}" min="0.5" max="12" step="0.5" value="${e.duracion || 2}"></div>
+        </div>
+        <div class="row-actions"><button class="btn" data-action="agendaEvento" data-i="${i}">Añadir al calendario</button><button class="btn danger" data-action="borrarEvento" data-i="${i}" data-confirm="1">Quitar</button></div>
+      </div>`;
+    }).join('');
+    return `<section style="margin-top:0"><h2>Conciertos y citas</h2>${evs || '<p class="muted small">Sin citas.</p>'}
+      <div class="row-actions"><button class="btn" data-action="addEvento">+ Añadir cita</button>${(c.eventos || []).length ? '<button class="btn" data-action="agendarTodo">Añadir todas al calendario</button>' : ''}</div>
+    </section>
       <section><h2>Cañas</h2>
         <div class="grid2"><div class="field"><label for="cf-inst">Instrumento</label><input type="text" id="cf-inst" value="${esc(c.instrumento)}" placeholder="p. ej. saxo alto"></div>
         <div class="field"><label for="cf-marca">Marca</label><input type="text" id="cf-marca" value="${esc(c.marca)}"></div>
@@ -825,8 +967,15 @@ function leerAjustes() {
   const val = (id, def) => { const el = $('#' + id); return el ? el.value.trim() : def; };
   const rod = list(val('cf-rod', (S.config.rodaje || []).join(','))).map(Number).filter((n) => n > 0);
   const agr = list(val('cf-agr', (S.config.agrupaciones || []).join(',')));
-  const eventos = (S.config.eventos || []).map((e, i) => ({...e, nombre: val('ev-n-' + i, e.nombre) || e.nombre,
-    agrupacion: val('ev-a-' + i, e.agrupacion), fecha: val('ev-f-' + i, e.fecha || '') || null}));
+  const eventos = (S.config.eventos || []).map((e, i) => {
+    const tipo = val('ev-tipo-' + i, e.tipo || 'puntual'), frecuencia = val('ev-frec-' + i, e.frecuencia || 'semanal');
+    return {...e, nombre: val('ev-n-' + i, e.nombre) || e.nombre, agrupacion: val('ev-a-' + i, e.agrupacion), tipo,
+      fecha: tipo === 'puntual' ? (val('ev-f-' + i, e.fecha || '') || null) : (e.fecha || null),
+      hora: val('ev-h-' + i, e.hora || '') || null, duracion: Number(val('ev-dur-' + i, e.duracion || 2)) || 2,
+      frecuencia, diaSemana: intOrNull(val('ev-dsem-' + i, e.diaSemana ?? '')) ?? (e.diaSemana ?? 0),
+      diaMes: intOrNull(val('ev-dmes-' + i, e.diaMes ?? '')) ?? (e.diaMes ?? 1),
+      desde: val('ev-desde-' + i, e.desde || todayISO()) || todayISO(), hasta: val('ev-hasta-' + i, e.hasta || '') || null};
+  });
   return {...S.config, instrumento: val('cf-inst', S.config.instrumento), marca: val('cf-marca', S.config.marca),
     modelo: val('cf-modelo', S.config.modelo), dureza: val('cf-dur', S.config.dureza),
     rodaje: rod.length ? rod : DEFAULT_CONFIG.rodaje, agrupaciones: agr.length ? agr : DEFAULT_CONFIG.agrupaciones, eventos};
@@ -898,9 +1047,25 @@ const ACTIONS = {
   },
   guardarSesion() { guardarSesion(); },
   addEvento() {
-    const cfg = leerAjustes();
-    cfg.eventos.push({id: 'ev' + uid(), nombre: 'Nuevo concierto', agrupacion: cfg.agrupaciones[0] || '', fecha: null});
+    const cfg = leerAjustes(), hoy = todayISO();
+    cfg.eventos.push({id: 'ev' + uid(), nombre: 'Nuevo concierto', agrupacion: cfg.agrupaciones[0] || '',
+      tipo: 'puntual', fecha: null, hora: null, duracion: 2,
+      frecuencia: 'semanal', diaSemana: new Date().getDay(), diaMes: 1, desde: hoy, hasta: null});
     safe(() => putConfig(cfg));
+  },
+  async agendaEvento(el) {
+    const i = +el.dataset.i, cfg = leerAjustes();
+    if (!(await safe(() => putConfig(cfg)))) return;
+    await descargarICS([cfg.eventos[i]], cfg.eventos[i].nombre);
+  },
+  async agendarTodo() {
+    const cfg = leerAjustes();
+    if (!(await safe(() => putConfig(cfg)))) return;
+    await descargarICS(cfg.eventos, 'atril-citas');
+  },
+  copiarIcs() {
+    const t = $('#ics-txt');
+    navigator.clipboard.writeText(t.value).then(() => toast('Copiado'), () => { t.focus(); t.select(); toast('Selecciona y copia el texto'); });
   },
   borrarEvento(el) {
     const i = +el.dataset.i, cfg = leerAjustes();
@@ -954,7 +1119,7 @@ const ACTIONS = {
           await putRaw(c, x.id, res); cambios++;
         }
       }
-      if (o.config && (modo === 'reemplazar' || String(o.config.mod || '') > String(S.config.mod || ''))) { await putConfigRaw(o.config); cambios++; }
+      if (o.config && (modo === 'reemplazar' || !S.config.mod || (o.config.mod && String(o.config.mod) > String(S.config.mod)))) { await putConfigRaw(o.config); cambios++; }
     });
     if (ok) { toast(cambios ? `Importado: ${cambios} cambios` : 'No había nada nuevo'); $('#imp').value = ''; }
   },
@@ -984,7 +1149,18 @@ document.addEventListener('change', (e) => {
   if (t.id === 'm-sub') { Met.sub = +t.value; Met.idx = 0; }
   if (t.id === 'm-acc') Met.accent = t.checked;
   if (t.id === 'imp-file' && t.files[0]) { const r = new FileReader(); r.onload = () => { $('#imp').value = r.result; toast('Archivo cargado: pulsa «Combinar con mis datos»'); }; r.readAsText(t.files[0]); }
+  if (t.dataset.actionChange === 'tipoEvento') { const i = t.dataset.i; $('#ev-puntual-' + i).hidden = t.value === 'periodico'; $('#ev-periodico-' + i).hidden = t.value === 'puntual'; actualizarResumenEvento(i); }
+  if (t.dataset.actionChange === 'frecEvento') { const i = t.dataset.i, mensual = t.value === 'mensual'; $('#ev-dsem-wrap-' + i).hidden = mensual; $('#ev-dmes-wrap-' + i).hidden = !mensual; actualizarResumenEvento(i); }
+  const evm = t.id && t.id.match(/^ev-(dsem|dmes|desde|hasta)-(\d+)$/);
+  if (evm) actualizarResumenEvento(evm[2]);
 });
+function actualizarResumenEvento(i) {
+  const el = $('#ev-resumen-' + i); if (!el) return;
+  const val = (id, def) => { const e = $('#' + id); return e ? e.value : def; };
+  const ev = {tipo: 'periodico', frecuencia: val('ev-frec-' + i, 'semanal'), diaSemana: Number(val('ev-dsem-' + i, 0)),
+    diaMes: Number(val('ev-dmes-' + i, 1)), desde: val('ev-desde-' + i, todayISO()) || todayISO(), hasta: val('ev-hasta-' + i, '') || null};
+  el.textContent = resumenRecurrencia(ev) + ' · próxima: ' + fmtDate(nextOcurrencia(ev, todayISO()));
+}
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && SHEET) closeSheet(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleRender(); });
 
