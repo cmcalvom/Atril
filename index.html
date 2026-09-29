@@ -189,7 +189,7 @@ textarea{min-height:76px;resize:vertical}
 
 /* navegación */
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
-nav.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+nav.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
 nav.tabs button{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 10px;font-size:12px;font-weight:700;color:var(--muted);min-height:56px}
 nav.tabs button svg{width:24px;height:24px}
 nav.tabs button[aria-current="page"]{color:var(--brass)}
@@ -206,6 +206,7 @@ nav.tabs button[aria-current="page"]{color:var(--brass)}
 <nav class="tabs" aria-label="Secciones"><div class="in">
   <button data-action="tab" data-tab="hoy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Hoy</button>
   <button data-action="tab" data-tab="piezas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>Piezas</button>
+  <button data-action="tab" data-tab="estudio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>Estudio</button>
   <button data-action="tab" data-tab="canas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 22V8c0-4 2-6 4-6s4 2 4 6v14z"/><path d="M8.5 12q3.5 2.5 7 0"/></svg>Cañas</button>
   <button data-action="tab" data-tab="mas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Ajustes</button>
 </div></nav>
@@ -250,8 +251,8 @@ const TARGET = 'pwa';
 const SEED = /*@@SEED@@*/null;
 const DEFAULT_CONFIG = {instrumento: '', marca: '', modelo: '', dureza: '',
   agrupaciones: ['Big band', 'Orquesta', 'Clases', 'Combo'], eventos: [], rodaje: [3, 3, 5, 5, 7, 7, 10, 10, 20]};
-const COLLS = ['piezas', 'sesiones', 'canas'];
-const S = {piezas: {}, sesiones: {}, canas: {}, config: {...DEFAULT_CONFIG}, mode: 'loading', loaded: {}};
+const COLLS = ['piezas', 'sesiones', 'canas', 'apuntes'];
+const S = {piezas: {}, sesiones: {}, canas: {}, apuntes: {}, config: {...DEFAULT_CONFIG}, mode: 'loading', loaded: {}};
 let DB = null;
 const LS_KEY = 'atril-y-canas-v1';
 
@@ -262,7 +263,8 @@ function loadLocal() {
   } catch (e) { /* sin almacenamiento local */ }
 }
 function saveLocal() {
-  localStorage.setItem(LS_KEY, JSON.stringify({piezas: S.piezas, sesiones: S.sesiones, canas: S.canas, config: S.config}));
+  const o = {config: S.config}; COLLS.forEach((c) => { o[c] = S[c]; });
+  localStorage.setItem(LS_KEY, JSON.stringify(o));
 }
 const localVacio = () => COLLS.every((c) => !Object.keys(S[c]).length);
 function cargarSeed() {
@@ -341,7 +343,7 @@ async function initStore() {
   if (TARGET === 'pwa' && navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   render();
 }
-const ready = () => S.mode === 'local' || (S.mode === 'db' && ['piezas', 'sesiones', 'canas', 'config'].every((k) => S.loaded[k]));
+const ready = () => S.mode === 'local' || (S.mode === 'db' && ['piezas', 'sesiones', 'canas', 'apuntes', 'config'].every((k) => S.loaded[k]));
 
 /* ============ cálculos ============ */
 const eventoDe = (p) => (S.config.eventos || []).find((e) => e.id === p.evento) || null;
@@ -349,6 +351,21 @@ function limiteDeEvento(ev) { return ev ? nextOcurrencia(ev, todayISO()) : null;
 const limiteDe = (p) => p.fechaLimite || limiteDeEvento(eventoDe(p));
 const sesionesDe = (pid) => Object.values(S.sesiones).filter((s) => s.piezaId === pid)
   .sort((a, b) => a.fecha.localeCompare(b.fecha) || String(a.creada || '').localeCompare(String(b.creada || '')));
+
+/* ---- notas de ensayo/clase y pendientes de estudio ---- */
+function opcionesPiezas(sel, vacio) {
+  const piezas = Object.values(S.piezas).filter((p) => p.estado !== 'archivada');
+  const agrs = [...new Set(piezas.map((p) => p.agrupacion))];
+  return `<option value="">${esc(vacio)}</option>` + agrs.map((a) => `<optgroup label="${esc(a)}">${piezas.filter((p) => p.agrupacion === a)
+    .sort((x, y) => (x.orden ?? 99) - (y.orden ?? 99) || x.titulo.localeCompare(y.titulo))
+    .map((p) => `<option value="${esc(p.id)}" ${p.id === sel ? 'selected' : ''}>${esc(p.titulo)}</option>`).join('')}</optgroup>`).join('');
+}
+function apuntesDe(pid) { return Object.values(S.apuntes || {}).filter((a) => (a.piezaIds || []).includes(pid)).sort((a, b) => b.fecha.localeCompare(a.fecha)); }
+function pendientesTodos() {
+  const out = [];
+  Object.values(S.apuntes || {}).forEach((a) => { (a.pendientes || []).forEach((pd) => out.push({...pd, apunteId: a.id, fecha: a.fecha, agrupacion: a.agrupacion})); });
+  return out;
+}
 
 function statsPieza(p) {
   const todas = sesionesDe(p.id);
@@ -528,6 +545,7 @@ function bannerHoy() {
 let TAB = 'hoy';
 try { TAB = localStorage.getItem('atril-tab') || 'hoy'; } catch (e) { /* ignorar */ }
 const FILTRO = {agr: 'Todas', estado: 'estudio'};
+const FILTRO_EST = {agr: 'Todas'};
 
 function estadoChip(st) {
   if (st.estado === 'sinTempo') return '<span class="chip warn">Falta tempo objetivo</span>';
@@ -549,6 +567,14 @@ function piezaRow(p) {
     <div class="bar ${cls}"><span style="width:${Math.round((st.pct ?? 0) * 100)}%"></span></div>
   </button>`;
 }
+function pendienteLi(item) {
+  const p = item.piezaId ? S.piezas[item.piezaId] : null, hecho = !!item.hecho;
+  return `<li>
+    <button class="x" data-action="togglePendiente" data-apunte="${esc(item.apunteId)}" data-item="${esc(item.id)}" aria-label="${hecho ? 'Marcar como pendiente' : 'Marcar como hecho'}" style="${hecho ? 'color:var(--good)' : ''}">${hecho ? '✓' : '○'}</button>
+    <span class="h-main" style="${hecho ? 'text-decoration:line-through;color:var(--muted)' : ''}"><span>${esc(item.texto)}</span><span class="chip">${esc(item.agrupacion)}</span>${p ? `<span class="chip">${esc(p.titulo)}</span>` : ''}<span class="muted">${fmtDate(item.fecha)}</span></span>
+    <button class="x" data-action="borrarPendiente" data-apunte="${esc(item.apunteId)}" data-item="${esc(item.id)}" data-confirm="1" aria-label="Borrar">✕</button>
+  </li>`;
+}
 
 const VIEWS = {
   hoy() {
@@ -558,6 +584,7 @@ const VIEWS = {
     const minSem = semana.reduce((a, s) => a + (s.minutos || 0), 0);
     const piezas = Object.values(S.piezas).filter((p) => p.estado === 'estudio').map((p) => ({p, st: statsPieza(p)}))
       .sort((a, b) => (ORDEN_ESTADO[a.st.estado] - ORDEN_ESTADO[b.st.estado]) || ((a.st.pct ?? 2) - (b.st.pct ?? 2)) || ((a.p.orden ?? 99) - (b.p.orden ?? 99)));
+    const pend = pendientesTodos().filter((x) => !x.hecho), pendSemana = pend.filter((x) => x.fecha >= lunes).length;
     let evHTML = '<div class="card hero-ev"><p class="eyebrow">Próxima cita</p><p class="muted small">Añade conciertos o ensayos en Ajustes.</p></div>';
     if (ev) {
       const faltan = ev._next ? daysBetween(hoy, ev._next) : null;
@@ -573,10 +600,12 @@ const VIEWS = {
     </div>`;
     return `${bannerHoy()}
       <button class="cta" data-action="sesion">Empezar sesión</button>
+      <button class="btn" data-action="apunte" style="width:100%;margin-top:8px">+ Nota de ensayo o clase</button>
       <div class="grid2" style="margin-top:12px">${evHTML}${reedHTML}</div>
       <section><p class="eyebrow">Esta semana</p>
         <div class="kpis"><div class="kpi"><b>${minSem}</b><span>minutos</span></div><div class="kpi"><b>${semana.length}</b><span>sesiones</span></div><div class="kpi"><b>${new Set(semana.map((x) => x.piezaId)).size}</b><span>piezas</span></div></div>
       </section>
+      ${pend.length ? `<button class="btn" data-action="tab" data-tab="estudio" style="width:100%;text-align:left">${pend.length} pendiente${pend.length === 1 ? '' : 's'} de estudio${pendSemana ? ' · ' + pendSemana + ' esta semana' : ''}</button>` : ''}
       <section><div class="group-h"><h2>En estudio</h2><span class="muted small">${piezas.length} piezas</span></div>
         ${piezas.length ? `<div class="list">${piezas.map((x) => piezaRow(x.p)).join('')}</div>` : '<div class="card empty-state">No hay piezas en estudio. Añádelas en Piezas.</div>'}
       </section>`;
@@ -616,6 +645,25 @@ const VIEWS = {
       <div class="reeds">${cards}</div>
       <section><details class="retired"><summary>Cañas retiradas (${retiradas.length})</summary>
         ${retiradas.map((c) => { const s = statsCana(c); return `<button class="rt-row" data-action="cana" data-id="${esc(c.id)}"><span><b>Caña ${c.slot}</b> · ${s.usos.length} usos</span><span class="muted">${c.estreno ? fmtDate(c.estreno) + ' → ' : 'hasta '}${fmtDate(c.retirada)}</span></button>`; }).join('') || '<p class="muted small">Ninguna todavía.</p>'}
+      </details></section>`;
+  },
+
+  estudio() {
+    const hoy = todayISO(), lunes = addDays(hoy, -((parseISO(hoy).getDay() + 6) % 7));
+    const agrs = ['Todas', ...(S.config.agrupaciones || [])];
+    let items = pendientesTodos();
+    if (FILTRO_EST.agr !== 'Todas') items = items.filter((x) => x.agrupacion === FILTRO_EST.agr);
+    const pend = items.filter((x) => !x.hecho).sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const hechos = items.filter((x) => x.hecho).sort((a, b) => String(b.hechoFecha || b.fecha).localeCompare(String(a.hechoFecha || a.fecha)));
+    const semana = pend.filter((x) => x.fecha >= lunes), previas = pend.filter((x) => x.fecha < lunes);
+    return `<div class="chips" role="group" aria-label="Agrupación">${agrs.map((a) => `<button class="filter" data-action="festEstAgr" data-v="${esc(a)}" aria-pressed="${FILTRO_EST.agr === a}">${esc(a)}</button>`).join('')}</div>
+      <button class="cta" data-action="apunte" style="margin-top:12px">+ Nota de ensayo</button>
+      <section><div class="group-h"><h2>Esta semana</h2><span class="muted small">${semana.length}</span></div>
+        ${semana.length ? `<ul class="hist">${semana.map(pendienteLi).join('')}</ul>` : '<div class="card empty-state">Nada pendiente para esta semana.</div>'}
+      </section>
+      ${previas.length ? `<section><div class="group-h"><h2>De semanas anteriores</h2><span class="muted small">${previas.length}</span></div><ul class="hist">${previas.map(pendienteLi).join('')}</ul></section>` : ''}
+      <section><details class="retired"><summary>Hechos (${hechos.length})</summary>
+        ${hechos.length ? `<ul class="hist">${hechos.map(pendienteLi).join('')}</ul>` : '<p class="muted small">Ninguno todavía.</p>'}
       </details></section>`;
   },
 
@@ -688,7 +736,7 @@ const VIEWS = {
 let rafPending = false;
 function scheduleRender() { if (!rafPending) { rafPending = true; requestAnimationFrame(() => { rafPending = false; render(); }); } }
 function render() {
-  const titles = {hoy: 'Hoy', piezas: 'Piezas', canas: 'Cañas', mas: 'Ajustes'};
+  const titles = {hoy: 'Hoy', piezas: 'Piezas', estudio: 'Estudio', canas: 'Cañas', mas: 'Ajustes'};
   $('#title').textContent = titles[TAB];
   $('#subtitle').textContent = TAB === 'hoy' ? fmtLong(todayISO()) : TAB === 'canas' ? S.config.instrumento || '' : '';
   document.querySelectorAll('nav.tabs button').forEach((b) => b.setAttribute('aria-current', b.dataset.tab === TAB ? 'page' : 'false'));
@@ -767,6 +815,7 @@ function openPieza(id) {
       <div class="card">${chartPieza(st)}</div>
       <div class="row-actions" style="margin-top:12px"><button class="btn primary" data-action="sesion" data-id="${esc(id)}">Estudiar ahora</button><button class="btn" data-action="piezaForm" data-id="${esc(id)}">Editar pieza</button></div>
       ${p.notas ? `<section><p class="eyebrow">Notas</p><p style="margin:0;white-space:pre-wrap">${esc(p.notas)}</p></section>` : ''}
+      ${(() => { const aps = apuntesDe(p.id); return aps.length ? `<section><p class="eyebrow">Ensayada en clase (${aps.length})</p><ul class="hist">${aps.slice(0, 8).map((a) => `<li><span class="chip">${esc(a.agrupacion)}</span><span class="h-main"><span>${fmtDate(a.fecha)}</span></span><button class="x" data-action="apunte" data-id="${esc(a.id)}" aria-label="Abrir nota">→</button></li>`).join('')}</ul></section>` : ''; })()}
       <section><p class="eyebrow">Sesiones (${st.todas.length})</p>
       ${st.todas.length ? `<ul class="hist">${[...st.todas].reverse().map((s) => `<li><span class="num" style="font-size:20px;font-weight:600">${s.tempoLimpio ?? '—'}</span>
         <span class="h-main"><span>${fmtDate(s.fecha)}</span>${s.minutos ? `<span class="muted">${s.minutos} min</span>` : ''}${s.tempoTrabajo && s.tempoTrabajo !== s.tempoLimpio ? `<span class="muted">metrónomo ${s.tempoTrabajo}</span>` : ''}${s.canaId && S.canas[s.canaId] ? `<span class="chip">caña ${S.canas[s.canaId].slot}</span>` : ''}${s.notas ? `<span class="muted">${esc(s.notas)}</span>` : ''}</span>
@@ -961,6 +1010,54 @@ async function guardarSesion() {
   if (ok) closeSheet();
 }
 
+/* ---------- nota de ensayo/clase ---------- */
+let APUNTE_DRAFT = null;
+function bodyApunte() {
+  const d = APUNTE_DRAFT;
+  const rowPieza = (pid, i) => `<div class="row-actions" style="align-items:center;flex-wrap:nowrap">
+    <select id="ap-pz-${i}" style="flex:1">${opcionesPiezas(pid, 'Elige una pieza…')}</select>
+    <button class="icon-btn" data-action="quitarPiezaApunte" data-i="${i}" aria-label="Quitar">✕</button>
+  </div>`;
+  const rowPend = (pd, i) => `<div class="card stack" style="gap:8px">
+    <div class="field"><label for="ap-pd-t-${i}">Qué estudiar</label><input type="text" id="ap-pd-t-${i}" value="${esc(pd.texto)}" placeholder="compases 32-40, escalas, articulación…"></div>
+    <div class="field"><label for="ap-pd-p-${i}">Pieza (opcional)</label><select id="ap-pd-p-${i}">${opcionesPiezas(pd.piezaId, 'Ejercicio suelto (sin pieza)')}</select></div>
+    <button class="btn danger" data-action="quitarPendienteApunte" data-i="${i}">Quitar</button>
+  </div>`;
+  return `<div class="stack">
+    <div class="grid2">
+      <div class="field"><label for="ap-fecha">Fecha</label><input type="date" id="ap-fecha" value="${esc(d.fecha)}"></div>
+      <div class="field"><label for="ap-agr">Agrupación</label><select id="ap-agr">${(S.config.agrupaciones || []).map((a) => `<option ${a === d.agrupacion ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select></div>
+    </div>
+    <section style="margin-top:4px"><h2 style="font-size:18px">Piezas trabajadas hoy</h2>
+      ${d.piezaIds.length ? d.piezaIds.map((pid, i) => rowPieza(pid, i)).join('') : '<p class="muted small">Ninguna todavía.</p>'}
+      <button class="btn" data-action="addPiezaApunte">+ Añadir pieza</button>
+    </section>
+    <section><h2 style="font-size:18px">Para estudiar esta semana</h2>
+      ${d.pendientes.length ? d.pendientes.map((pd, i) => rowPend(pd, i)).join('') : '<p class="muted small">Ninguno todavía.</p>'}
+      <button class="btn" data-action="addPendienteApunte">+ Añadir pasaje o ejercicio</button>
+    </section>
+    <div class="field"><label for="ap-notas">Notas generales</label><textarea id="ap-notas">${esc(d.notas)}</textarea></div>
+    <button class="cta" data-action="guardarApunte" style="margin-top:8px">Guardar nota</button>
+    ${d.id ? `<button class="btn danger" data-action="borrarApunte" data-confirm="1">Borrar nota</button>` : ''}
+  </div>`;
+}
+function renderApunteSheet() { const b = $('#sheet-body'); if (b) b.innerHTML = bodyApunte(); }
+function leerApunteDraft() {
+  const val = (id, def) => { const el = $('#' + id); return el ? el.value : def; };
+  APUNTE_DRAFT.fecha = val('ap-fecha', APUNTE_DRAFT.fecha) || todayISO();
+  APUNTE_DRAFT.agrupacion = val('ap-agr', APUNTE_DRAFT.agrupacion);
+  APUNTE_DRAFT.piezaIds = APUNTE_DRAFT.piezaIds.map((pid, i) => val('ap-pz-' + i, pid));
+  APUNTE_DRAFT.pendientes = APUNTE_DRAFT.pendientes.map((pd, i) => ({...pd, texto: val('ap-pd-t-' + i, pd.texto), piezaId: val('ap-pd-p-' + i, pd.piezaId) || null}));
+  APUNTE_DRAFT.notas = val('ap-notas', APUNTE_DRAFT.notas);
+}
+function openApunte(id) {
+  const a = id ? S.apuntes[id] : null;
+  APUNTE_DRAFT = a
+    ? {id: a.id, fecha: a.fecha, agrupacion: a.agrupacion, piezaIds: [...(a.piezaIds || [])], pendientes: (a.pendientes || []).map((p) => ({...p})), notas: a.notas || ''}
+    : {id: null, fecha: todayISO(), agrupacion: (S.config.agrupaciones || [])[0] || '', piezaIds: [], pendientes: [], notas: ''};
+  openSheet(a ? 'Editar nota' : 'Nota de ensayo', 'form', bodyApunte);
+}
+
 /* ============ acciones ============ */
 function leerAjustes() {
   const list = (v) => String(v || '').split(',').map((x) => x.trim()).filter(Boolean);
@@ -999,7 +1096,15 @@ const ACTIONS = {
   },
   async borrarPieza(el) {
     const id = el.dataset.id;
-    const ok = await safe(async () => { for (const s of sesionesDe(id)) await del('sesiones', s.id); await del('piezas', id); }, 'Pieza borrada');
+    const ok = await safe(async () => {
+      for (const s of sesionesDe(id)) await del('sesiones', s.id);
+      for (const a of Object.values(S.apuntes || {})) {
+        if ((a.piezaIds || []).includes(id) || (a.pendientes || []).some((p) => p.piezaId === id)) {
+          await put('apuntes', a.id, {...a, piezaIds: (a.piezaIds || []).filter((x) => x !== id), pendientes: (a.pendientes || []).map((p) => p.piezaId === id ? {...p, piezaId: null} : p)});
+        }
+      }
+      await del('piezas', id);
+    }, 'Pieza borrada');
     if (ok) closeSheet();
   },
   async borrarSesion(el) { await safe(() => del('sesiones', el.dataset.id), 'Sesión borrada'); },
@@ -1077,7 +1182,7 @@ const ACTIONS = {
     safe(() => putConfig(leerAjustes()), 'Ajustes guardados');
   },
   async exportar() {
-    const data = {app: 'atril-y-canas', exportado: nowISO(), origen: TARGET, config: S.config, piezas: Object.values(S.piezas), sesiones: Object.values(S.sesiones), canas: Object.values(S.canas)};
+    const data = {app: 'atril-y-canas', exportado: nowISO(), origen: TARGET, config: S.config, piezas: Object.values(S.piezas), sesiones: Object.values(S.sesiones), canas: Object.values(S.canas), apuntes: Object.values(S.apuntes)};
     const txt = JSON.stringify(data, null, 1), name = 'atril-y-canas-' + todayISO() + '.json';
     const hecho = () => { try { localStorage.setItem('atril-ultima-copia', todayISO()); } catch (e) { /* ignorar */ } toast('Copia exportada'); render(); };
     if (TARGET === 'pwa') {
@@ -1103,7 +1208,7 @@ const ACTIONS = {
     try { o = JSON.parse($('#imp').value); } catch (e) { toast('El texto no es un JSON válido.'); return; }
     if (!o || !Array.isArray(o.piezas) || !Array.isArray(o.canas)) { toast('Falta la lista de piezas o de cañas.'); return; }
     const modo = el.dataset.modo;
-    const nuevo = {piezas: o.piezas, sesiones: o.sesiones || [], canas: o.canas};
+    const nuevo = {piezas: o.piezas, sesiones: o.sesiones || [], canas: o.canas, apuntes: o.apuntes || []};
     let cambios = 0;
     const ok = await safe(async () => {
       for (const c of COLLS) {
@@ -1122,6 +1227,37 @@ const ACTIONS = {
       if (o.config && (modo === 'reemplazar' || !S.config.mod || (o.config.mod && String(o.config.mod) > String(S.config.mod)))) { await putConfigRaw(o.config); cambios++; }
     });
     if (ok) { toast(cambios ? `Importado: ${cambios} cambios` : 'No había nada nuevo'); $('#imp').value = ''; }
+  },
+  festEstAgr(el) { FILTRO_EST.agr = el.dataset.v; render(); },
+  apunte(el) { openApunte(el.dataset.id || ''); },
+  addPiezaApunte() { leerApunteDraft(); APUNTE_DRAFT.piezaIds.push(''); renderApunteSheet(); },
+  quitarPiezaApunte(el) { leerApunteDraft(); APUNTE_DRAFT.piezaIds.splice(+el.dataset.i, 1); renderApunteSheet(); },
+  addPendienteApunte() { leerApunteDraft(); APUNTE_DRAFT.pendientes.push({id: 'pd' + uid(), texto: '', piezaId: null, hecho: false, hechoFecha: null}); renderApunteSheet(); },
+  quitarPendienteApunte(el) { leerApunteDraft(); APUNTE_DRAFT.pendientes.splice(+el.dataset.i, 1); renderApunteSheet(); },
+  async guardarApunte() {
+    leerApunteDraft();
+    const piezaIds = APUNTE_DRAFT.piezaIds.filter(Boolean);
+    const pendientes = APUNTE_DRAFT.pendientes.filter((p) => p.texto.trim()).map((p) => ({...p, texto: p.texto.trim(), piezaId: p.piezaId || null}));
+    if (!piezaIds.length && !pendientes.length && !APUNTE_DRAFT.notas.trim()) { toast('Añade al menos una pieza, un pendiente o una nota.'); return; }
+    const id = APUNTE_DRAFT.id || 'ap' + uid();
+    const prev = S.apuntes[id] || {creada: nowISO()};
+    const ok = await safe(() => put('apuntes', id, {...prev, fecha: APUNTE_DRAFT.fecha || todayISO(), agrupacion: APUNTE_DRAFT.agrupacion, piezaIds, pendientes, notas: APUNTE_DRAFT.notas.trim()}), 'Nota guardada');
+    if (ok) closeSheet();
+  },
+  async borrarApunte() {
+    if (!APUNTE_DRAFT || !APUNTE_DRAFT.id) return;
+    const ok = await safe(() => del('apuntes', APUNTE_DRAFT.id), 'Nota borrada');
+    if (ok) closeSheet();
+  },
+  async togglePendiente(el) {
+    const aid = el.dataset.apunte, pid = el.dataset.item, a = S.apuntes[aid]; if (!a) return;
+    const pendientes = (a.pendientes || []).map((p) => { if (p.id !== pid) return p; const nuevo = !p.hecho; return {...p, hecho: nuevo, hechoFecha: nuevo ? todayISO() : null}; });
+    await safe(() => put('apuntes', aid, {...a, pendientes}));
+  },
+  async borrarPendiente(el) {
+    const aid = el.dataset.apunte, pid = el.dataset.item, a = S.apuntes[aid]; if (!a) return;
+    const pendientes = (a.pendientes || []).filter((p) => p.id !== pid);
+    await safe(() => put('apuntes', aid, {...a, pendientes}), 'Quitado');
   },
 };
 
